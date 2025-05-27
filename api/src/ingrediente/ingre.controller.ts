@@ -13,8 +13,8 @@ export class IngreController{
     }
 
     @Get(':id')
-    async getIngreById(@Param(':id') id:number) {
-        return await this.ingreService.getIngreById(id);
+    async getIngreById(@Param('id') id:string) {
+        return await this.ingreService.getIngreById(Number(id));
     }
 
     @Post()
@@ -23,7 +23,7 @@ export class IngreController{
     }
 
     @Put(':id')
-    async updateIngre(@Param(':id') id: string, @Body() data: ingre) {
+    async updateIngre(@Param('id') id: string, @Body() data: ingre) {
         return await this.ingreService.updateIngre(Number(id), data);
     }
 
