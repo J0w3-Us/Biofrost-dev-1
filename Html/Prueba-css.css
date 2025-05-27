@@ -1,0 +1,73 @@
+body
+{
+    background-color: black;
+}
+.nav
+{
+    background-color: #975ec2;
+    margin-top: auto;
+    width: auto;
+    height: auto;
+    flex: 1;
+}
+head
+{
+    position: relative;
+    text-align: center;
+    position: fixed;
+}
+h1
+{
+    text-align: center;
+    color: white;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-size: 80px;
+}
+#menu
+{
+    width: 10px 0 0;
+    height: 20px 0 0;
+    margin-top: auto;
+    text-align: center;
+    list-style: none;
+}
+#menu li
+{
+    display: inline-block;
+}
+#menu li a
+{
+    color: white;
+    text-transform: uppercase;
+    text-decoration: none;
+    z-index: 1;
+    margin: 10px;
+    font-size: 18px;
+}
+#menu li :hover
+{
+    background: #504a4a;
+}
+#menu a :hover
+{
+    color: #504a4a;
+}
+#menu ::after
+#menu ::before
+{
+    position: absolute;
+    
+}
+h2
+{
+    color: white;
+    text-align: center;
+}
+p
+{
+    color: wheat;
+    align-items: center;
+    text-align: center;
+    margin: 20px;
+    text-decoration: solid;
+}
