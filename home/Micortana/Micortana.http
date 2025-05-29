@@ -1,0 +1,6 @@
+@Micortana_HostAddress = http://localhost:5222
+
+GET {{Micortana_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
