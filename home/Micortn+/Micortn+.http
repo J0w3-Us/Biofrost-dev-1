@@ -1,0 +1,6 @@
+@Micortn__HostAddress = http://localhost:5018
+
+GET {{Micortn__HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
