@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Micortn+")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+197f0773bdaa3d6dc1b0dfa4d1c7c1be689f4d5f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4dd65c8f6a7ab74badf6112002a0200cf5573f8b")]
 [assembly: System.Reflection.AssemblyProductAttribute("Micortn+")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Micortn+")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
