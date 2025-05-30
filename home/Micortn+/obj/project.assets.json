@@ -461,19 +461,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\fitch\\.nuget\\packages\\": {}
+    "C:\\Users\\andri\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\fitch\\source\\visual\\home\\Micortn+\\Micortn+.csproj",
+      "projectUniqueName": "C:\\Users\\andri\\OneDrive\\Desktop\\programacion\\repositorio\\poligono\\repositorio\\home\\Micortn+\\Micortn+.csproj",
       "projectName": "Micortn+",
-      "projectPath": "C:\\Users\\fitch\\source\\visual\\home\\Micortn+\\Micortn+.csproj",
-      "packagesPath": "C:\\Users\\fitch\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\fitch\\source\\visual\\home\\Micortn+\\obj\\",
+      "projectPath": "C:\\Users\\andri\\OneDrive\\Desktop\\programacion\\repositorio\\poligono\\repositorio\\home\\Micortn+\\Micortn+.csproj",
+      "packagesPath": "C:\\Users\\andri\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\andri\\OneDrive\\Desktop\\programacion\\repositorio\\poligono\\repositorio\\home\\Micortn+\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\fitch\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\andri\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
