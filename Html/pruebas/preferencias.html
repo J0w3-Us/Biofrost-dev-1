@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Construcción - Preferencias</title>
+    <link rel="stylesheet" href="style.prueba.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Preferencias de Usuario para Gestión de Construcción</h1>
+
+        <section class="preferences-section">
+            <h2>Preferencias de Obra ON</h2>
+            <div class="preferences-grid" id="on-preferences">
+                <div class="preference-item" data-preference="charlar-obra" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-comment-alt icon-overlay"></i>
+                    <span class="label">Charlar en obra</span>
+                </div>
+                <div class="preference-item" data-preference="musica-obra" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-music icon-overlay"></i>
+                    <span class="label">Música en obra</span>
+                </div>
+                <div class="preference-item" data-preference="lectura-planos" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-scroll icon-overlay"></i>
+                    <span class="label">Lectura de planos</span>
+                </div>
+
+                <div class="preference-item" data-preference="practicas-manuales" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-wrench icon-overlay"></i>
+                    <span class="label">Prácticas manuales</span>
+                </div>
+                <div class="preference-item" data-preference="descansos-programados" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-mug-hot icon-overlay"></i>
+                    <span class="label">Descansos programados</span>
+                </div>
+                <div class="preference-item" data-preference="zona-no-fumadores" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-smoking-ban icon-overlay"></i>
+                    <span class="label">Zona de no fumadores</span>
+                </div>
+
+                <div class="preference-item" data-preference="obrero" data-category="roles">
+                    <i class="fas fa-person icon"></i>
+                    <span class="label">Obrero</span>
+                </div>
+                <div class="preference-item" data-preference="supervisora" data-category="roles">
+                    <i class="fas fa-person-dress icon"></i>
+                    <span class="label">Supervisora</span>
+                </div>
+                <div class="preference-item" data-preference="rol-indistinto" data-category="roles">
+                    <i class="fas fa-people-arrows icon"></i>
+                    <span class="label">Indistinto</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="preferences-section">
+            <h2>Preferencias de Obra OFF</h2>
+            <div class="preferences-grid" id="off-preferences">
+                <div class="preference-item" data-preference="no-charlar-obra" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-comment-alt-slash icon-overlay"></i>
+                    <span class="label">No charlar en obra</span>
+                </div>
+                <div class="preference-item" data-preference="no-musica-obra" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-music-slash icon-overlay"></i>
+                    <span class="label">No música en obra</span>
+                </div>
+                <div class="preference-item" data-preference="no-lectura-planos" data-category="comunicacion">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-scroll icon-overlay-crossed"></i>
+                    <span class="label">No lectura de planos</span>
+                </div>
+
+                <div class="preference-item" data-preference="no-practicas-manuales" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-wrench icon-overlay-crossed"></i>
+                    <span class="label">No prácticas manuales</span>
+                </div>
+                <div class="preference-item" data-preference="no-descansos-programados" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-mug-hot icon-overlay-crossed"></i>
+                    <span class="label">No descansos programados</span>
+                </div>
+                <div class="preference-item" data-preference="no-zona-no-fumadores" data-category="interacciones">
+                    <i class="fas fa-helmet-safety icon"></i><i class="fas fa-smoking-ban icon-overlay-crossed"></i>
+                    <span class="label">No zona de no fumadores</span>
+                </div>
+
+                <div class="preference-item" data-preference="no-obrero" data-category="roles">
+                    <i class="fas fa-person-slash icon"></i>
+                    <span class="label">No Obrero</span>
+                </div>
+                <div class="preference-item" data-preference="no-supervisora" data-category="roles">
+                    <i class="fas fa-person-dress-slash icon"></i>
+                    <span class="label">No Supervisora</span>
+                </div>
+                <div class="preference-item" data-preference="rol-especifico" data-category="roles">
+                    <i class="fas fa-user-check icon"></i>
+                    <span class="label">Rol específico</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="preferences-section">
+            <h2>Equipo ON / OFF</h2>
+            <div class="equipment-grid" id="equipment-section">
+                <div class="equipment-item" data-equipment="casco" data-weight="1">
+                    <div class="icon-group">
+                        <i class="fas fa-hard-hat equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Casco</span>
+                    <span class="weight">Máximo 1 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="gafas-seguridad" data-weight="0.1">
+                    <div class="icon-group">
+                        <i class="fas fa-glasses equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Gafas de seguridad</span>
+                    <span class="weight">Máximo 0.1 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="chaleco-reflectante" data-weight="0.5">
+                    <div class="icon-group">
+                        <i class="fas fa-vest-patches equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Chaleco reflectante</span>
+                    <span class="weight">Máximo 0.5 kg.</span>
+                </div>
+
+                <div class="equipment-item" data-equipment="botas-seguridad" data-weight="2">
+                    <div class="icon-group">
+                        <i class="fas fa-shoe-prints equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Botas de seguridad</span>
+                    <span class="weight">Máximo 2 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="protectores-auditivos" data-weight="0.2">
+                    <div class="icon-group">
+                        <i class="fas fa-ear-muffs equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Protectores auditivos</span>
+                    <span class="weight">Máximo 0.2 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="guantes-trabajo" data-weight="0.3">
+                    <div class="icon-group">
+                        <i class="fas fa-hands-clapping equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Guantes de trabajo</span>
+                    <span class="weight">Máximo 0.3 kg.</span>
+                </div>
+
+                <div class="equipment-item" data-equipment="cinturon-herramientas" data-weight="5">
+                    <div class="icon-group">
+                        <i class="fas fa-tools equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Cinturón de herramientas</span>
+                    <span class="weight">Máximo 5 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="taladro-portatil" data-weight="3">
+                    <div class="icon-group">
+                        <i class="fas fa-drill equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Taladro portátil</span>
+                    <span class="weight">Máximo 3 kg.</span>
+                </div>
+                <div class="equipment-item" data-equipment="cinta-metrica" data-weight="0.1">
+                    <div class="icon-group">
+                        <i class="fas fa-ruler-horizontal equipment-icon active"></i>
+                        <i class="fas fa-check-circle checkmark active"></i>
+                    </div>
+                    <span class="label">Cinta métrica</span>
+                    <span class="weight">Máximo 0.1 kg.</span>
+                </div>
+            </div>
+        </section>
+
+        <button id="savePreferencesBtn">Guardar Preferencias</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
