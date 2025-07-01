@@ -29,6 +29,8 @@ namespace Micort.Domain.Entities
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
+        [Required]
+        [RegularExpression("^[0-9]+$", ErrorMessage = "Solo se permiten números enteros positivos, sin letras, símbolos ni espacios.")]
         public int Valor { get; set; }
         public bool Es_Par { get; set; }
         public bool Es_Impar { get; set; }

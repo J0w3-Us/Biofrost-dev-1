@@ -6,6 +6,7 @@ import datetime # Necesario para la conversión de fechas
 
 def Obtener_Manga(num_paginas):
     mangas_list = []
+    nombres_vistos = set()  # Para controlar duplicados
     for i in range(1, num_paginas + 1):
         url = f"https://api.jikan.moe/v4/manga?page={i}&limit=25"
         try:
@@ -40,9 +41,25 @@ def Obtener_Manga(num_paginas):
                         print(f"Advertencia: No se pudo parsear Fecha_Registro: '{fecha_registro_str}'. Se usará NULL.")
                         fecha_registro_obj = None
 
+                nombre = manga_data.get('title', None)
+                autor = manga_data.get('authors', [{}])[0].get('name', None) if manga_data.get('authors') else None
+
+                # FILTRO: No permitir datos nulos en ningún campo
+                if not (nombre and autor and fecha_emision_obj and fecha_registro_obj):
+                    print(f"Manga descartado por datos nulos: Nombre={nombre}, Autor={autor}, Fecha_Emision={fecha_emision_obj}, Fecha_Registro={fecha_registro_obj}")
+                    continue
+
+                # Si el nombre ya existe, eliminar el anterior y agregar el nuevo
+                if nombre in nombres_vistos:
+                    # Eliminar el manga anterior con ese nombre
+                    mangas_list = [m for m in mangas_list if m['Nombre'] != nombre]
+                    print(f"Nombre duplicado detectado: '{nombre}'. Se reemplaza por el nuevo registro.")
+                else:
+                    nombres_vistos.add(nombre)
+
                 manga_info = {
-                    'Nombre': manga_data.get('title', 'Sin Título'),
-                    'Autor': manga_data.get('authors', [{}])[0].get('name', 'Desconocido') if manga_data.get('authors') else 'Desconocido',
+                    'Nombre': nombre,
+                    'Autor': autor,
                     'Fecha_Emision': fecha_emision_obj,
                     'Fecha_Registro': fecha_registro_obj
                 }
@@ -64,7 +81,7 @@ def Obtener_Manga(num_paginas):
 
 # --- Lógica principal del script ---
 try:
-    print("Conectando a SQL Server...")
+    print("Conectando con somme......")
     conn = pyodbc.connect(
         'DRIVER={ODBC Driver 17 for SQL Server};'
         'SERVER=ServidorMangas.mssql.somee.com;'
@@ -72,6 +89,7 @@ try:
         'UID=L00pSsu_SQLLogin_1;'
         'PWD=Joweskate;'
         'TrustServerCertificate=yes;'
+        'Encrypt=no;'
     )
     cursor = conn.cursor()
 

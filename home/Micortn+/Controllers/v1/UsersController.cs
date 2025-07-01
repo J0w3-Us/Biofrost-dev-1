@@ -54,4 +54,3 @@ namespace Micort.Controllers.V1
         }
     }
 }
-// El controlador UsersController en v1 es redundante y debe eliminarse para evitar duplicados.

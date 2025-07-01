@@ -19,7 +19,19 @@ builder.Services.AddDbContext<MicortDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<NumberServices>();
+builder.Services.AddScoped<Micort.service.feactures.EncryptionService>();
 builder.Services.AddControllers();
+
+// Quitar autenticación y autorización para pruebas locales
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.Authority = "https://localhost:5001";
+        options.Audience = "api1";
+        options.RequireHttpsMetadata = false;
+    });
+
+// builder.Services.AddAuthorization();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(opcion =>
@@ -33,7 +45,7 @@ builder.Services.AddSwaggerGen(opcion =>
     // Configuración de seguridad para el botón Authorize y candados
     opcion.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Name = "Autorizacion",
+        Name = "Authorization",
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer",
         BearerFormat = "JWT",
@@ -58,18 +70,23 @@ builder.Services.AddSwaggerGen(opcion =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Habilitar DeveloperExceptionPage y Swagger en todos los entornos (incluyendo producción)
+app.UseDeveloperExceptionPage();
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Number Parity API v1");
-        options.RoutePrefix = string.Empty;
-    });
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Number Parity API v1");
+    options.RoutePrefix = string.Empty;
+});
+
+// Usar archivos de configuración según el entorno (asegura que los json se lean en producción)
+// Esto ya lo maneja automáticamente WebApplication.CreateBuilder(args),
+// pero si quieres asegurarte, puedes agregar:
+// builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+//                      .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
