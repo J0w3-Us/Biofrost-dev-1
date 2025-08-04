@@ -1,0 +1,59 @@
+git checkout maingit checkout maingit checkout main# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporal
+temp/
+tmp/
+
+# Archivos de scripts temporales
+*temp*.js
+*test*.js
+*script*.js
+initializeApp.js
+postman-*.js
+
+# Archivos de respaldo
+*.bak
+*.backup
+*.old
+
+# Archivos de datos temporales
+data/
+*.json.bak
+*.db
+*.sqlite
+
+# Archivos de caché
+.cache/
+*.cache

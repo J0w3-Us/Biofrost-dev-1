@@ -55,3 +55,16 @@ a
     text-decoration: none;
     color: 5265 C;
 }
+header .login{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 20px;
+}
+.login input[type="text"]{
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 10px;
+}

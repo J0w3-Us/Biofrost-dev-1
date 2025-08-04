@@ -1,0 +1,38 @@
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Superhero Battle Arena</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/retro.css">
+    <link rel="stylesheet" href="../../assets/css/components.css">
+    <link rel="stylesheet" href="../../assets/css/responsive.css">
+</head>
+<body>
+    <div class="auth-screen retro-border">
+        <h1 class="pixel-title">🎮 SUPERHERO ARENA</h1>
+        <form id="login-form" class="retro-form">
+        <div class="form-group">
+            <label for="username" class="pixel-label">Usuario:</label>
+            <input type="text" id="username" name="username" class="retro-input" required>
+        </div>
+        <div class="form-group">
+            <label for="password" class="pixel-label">Contraseña:</label>
+            <input type="password" id="password" name="password" class="retro-input" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="retro-button primary">Iniciar sesión</button>
+        </div>
+        <div class="form-actions">
+            <p>¿No tienes una cuenta?</p><a href="register.html">Registrate</a>
+        </div>
+        </form>
+        <div id="login-message"></div>
+    </div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/backend/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+/* 🎮 RETRO.CSS - Estilos Game Boy para Superhero Battle Arena */
+
+/* === VARIABLES CSS === */
+:root {
+    /* Colores Game Boy Classic */
+    --gb-dark-green: #0f380f;
+    --gb-medium-green: #306230;
+    --gb-light-green: #8bac0f;
+    --gb-lightest-green: #9bbc0f;
+    
+    /* Colores adicionales */
+    --success: #4caf50;
+    --error: #f44336;
+    --warning: #ff9800;
+    --info: #2196f3;
+    
+    /* Fuentes pixeladas */
+    --pixel-font: 'Courier New', monospace;
+    --pixel-size-small: 8px;
+    --pixel-size-medium: 12px;
+    --pixel-size-large: 16px;
+    --pixel-size-xl: 20px;
+    
+    /* Espaciado */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    
+    /* Sombras y bordes pixelados */
+    --pixel-border: 2px solid var(--gb-dark-green);
+    --pixel-shadow: 2px 2px 0px var(--gb-dark-green);
+    --pixel-shadow-inset: inset 2px 2px 0px var(--gb-light-green);
+}
+
+/* ...rest of file... */

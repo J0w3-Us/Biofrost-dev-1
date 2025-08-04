@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: superhero-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: superhero-api
+          property: port
+      - key: MONGODB_URI
+        sync: false  # Agregar en el dashboard de Render
+      - key: JWT_SECRET  
+        sync: false  # Agregar en el dashboard de Render
