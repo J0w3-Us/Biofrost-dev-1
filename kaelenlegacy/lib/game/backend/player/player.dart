@@ -244,7 +244,9 @@ class Player extends SpriteAnimationGroupComponent<PlayerState>
     if (other is Spike || other is HomingSpike) {
       // mark hit animation and notify game. Only set `current` if animations
       // were loaded to avoid assertion from the base class.
-      if (_hasAnimations && animations != null && animations!.containsKey(PlayerState.hit)) {
+      if (_hasAnimations &&
+          animations != null &&
+          animations!.containsKey(PlayerState.hit)) {
         current = PlayerState.hit;
       }
       if (gameRef is GameApi) {

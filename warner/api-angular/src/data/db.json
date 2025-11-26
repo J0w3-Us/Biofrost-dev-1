@@ -1,0 +1,29 @@
+{
+  "autos": [
+    {
+      "id": "1",
+      "make": "Toyota",
+      "model": "Camry",
+      "year": 2020,
+      "price": 24000
+    },
+    {
+      "make": "Fiesta",
+      "model": "Mustang",
+      "year": 2021,
+      "price": 24000,
+      "image": "",
+      "description": "",
+      "id": "3"
+    },
+    {
+      "id": "709f",
+      "make": "gtr",
+      "model": "gtr",
+      "year": 2025,
+      "price": 0,
+      "image": "https://auto-illustrierte.ch/fr/la-nissan-gtr-est-toujours-vivante--2750",
+      "description": ""
+    }
+  ]
+}

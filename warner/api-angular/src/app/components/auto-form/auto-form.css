@@ -1,0 +1,7 @@
+.form-shell { display: block; background: #ffffff; padding: 1.25rem; border-radius: 12px; box-shadow: 0 12px 30px rgba(2,6,23,0.12); }
+.form-row { display:flex; flex-direction:column; margin-bottom:0.75rem; }
+.form-row.small { width:48%; display:inline-block; margin-right:4%; }
+.form-row label { font-size:0.9rem; color:#444; margin-bottom:0.25rem; }
+.form-row input { padding:0.6rem; border:1px solid #e0e0e0; border-radius:8px; background: #fff; }
+.form-actions { display:flex; gap:0.5rem; margin-top:0.75rem; }
+.image-preview img { max-width:180px; max-height:120px; margin-top:0.5rem; border-radius:6px; object-fit:cover; }

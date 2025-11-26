@@ -1,0 +1,40 @@
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<style>
+  :host {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+  }
+
+  header.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  header.site-header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  nav a {
+    margin-left: 0.75rem;
+    color: #1976d2;
+    text-decoration: none;
+  }
+
+  main.app-main {
+    padding: 1rem;
+  }
+</style>
+
+<header class="site-header">
+  <h1>Concesionaria — Inventario de Autos</h1>
+  <nav>
+    <a href="/" aria-current="page">Autos</a>
+  </nav>
+</header>
+
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

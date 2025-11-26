@@ -1,1 +1,0 @@
-# Shine-test-movil

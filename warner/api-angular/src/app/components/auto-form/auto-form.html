@@ -1,0 +1,41 @@
+<div class="form-shell">
+    <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="form-row">
+            <label>Marca</label>
+            <input formControlName="make" placeholder="p. ej. Toyota" />
+        </div>
+
+        <div class="form-row">
+            <label>Modelo</label>
+            <input formControlName="model" placeholder="p. ej. Camry" />
+        </div>
+
+        <div class="form-row small">
+            <label for="year">Año</label>
+            <input id="year" title="Año" placeholder="2023" type="number" formControlName="year" />
+        </div>
+
+        <div class="form-row small">
+            <label for="price">Precio</label>
+            <input id="price" title="Precio" placeholder="15000" type="number" formControlName="price" />
+        </div>
+
+        <div class="form-row">
+            <label>Imagen (URL)</label>
+            <input formControlName="image" placeholder="https://..." />
+            <div class="image-preview" *ngIf="form.value.image">
+                <img [src]="form.value.image" alt="Vista previa" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label>Descripción</label>
+            <input formControlName="description" placeholder="Descripción corta" />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="add-btn">Guardar</button>
+            <button type="button" class="btn muted" (click)="doCancel()">Cancelar</button>
+        </div>
+    </form>
+</div>

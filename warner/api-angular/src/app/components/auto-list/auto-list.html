@@ -1,0 +1,77 @@
+<section class="autos-page">
+    <header class="autos-header">
+        <div class="header-left">
+            <h2>Inventario de Autos</h2>
+        </div>
+        <div class="header-actions">
+            <div class="search-container">
+                <input class="search-input" [formControl]="searchControl" placeholder="Buscar autos (marca, modelo...)"
+                    aria-label="Buscar autos" />
+            </div>
+            <button class="add-btn" aria-label="Agregar auto" (click)="openCreate()">
+                <span class="btn-icon">+</span>
+                Agregar Auto
+            </button>
+        </div>
+    </header>
+
+    <nav class="filter-tabs">
+    </nav>
+
+    <div *ngIf="loading" class="loading">Cargando autos...</div>
+
+    <div *ngIf="errorMsg" class="error">
+        <div>Error: {{ errorMsg }}</div>
+        <button class="retry" (click)="loadAutos()">Reintentar</button>
+    </div>
+
+    <div *ngIf="!loading && !errorMsg && autos.length === 0" class="empty">
+        No hay autos en el inventario.
+    </div>
+
+    <div class="content-area" *ngIf="!loading && !errorMsg">
+        <!-- Modal form: aparece centrado sobre la pantalla -->
+        <div class="modal-overlay" *ngIf="showForm" (click)="cancelForm()">
+            <div class="modal-dialog" (click)="$event.stopPropagation()">
+                <app-auto-form [auto]="editingAuto" (save)="onFormSave($event)" (cancel)="cancelForm()"></app-auto-form>
+            </div>
+        </div>
+
+        <div class="cars-grid" *ngIf="autos.length > 0">
+            <article class="car-card" *ngFor="let auto of autos">
+                <div class="card-image">
+                    <img [src]="imageFor(auto)"
+                        alt="{{ auto['marca'] || auto.make }} {{ auto['modelo'] || auto.model }}" />
+                </div>
+                <div class="card-content">
+                    <div class="car-brand">
+                        <h3>{{ auto['marca'] || auto.make || 'Marca' }}</h3>
+                    </div>
+                    <div class="car-model">{{ auto['modelo'] || auto.model || 'Modelo' }}</div>
+                    <div class="car-details">
+                        <span class="car-year">{{ auto.year || auto['anio'] || '—' }}</span>
+                        <span class="car-price">${{ (auto['precio'] || auto.price || 0) | number:'1.0-0' }}</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="edit-btn" (click)="openEdit(auto)" title="Editar" aria-label="Editar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="#fff" opacity="0.9" />
+                            <path
+                                d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                                fill="#fff" opacity="0.95" />
+                        </svg>
+                    </button>
+                    <button class="delete-btn" (click)="deleteAuto(auto.id)" title="Eliminar" aria-label="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true">
+                            <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12z" fill="#fff" opacity="0.95" />
+                            <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="#fff" opacity="0.95" />
+                        </svg>
+                    </button>
+                </div>
+            </article>
+        </div>
+    </div>
+</section>

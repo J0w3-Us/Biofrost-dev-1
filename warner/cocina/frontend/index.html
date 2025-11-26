@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocina Kinich | Experiencia Gastronómica</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Audio de ambiente (Selva/Naturaleza) -->
+    <!-- Usamos un sonido de ambiente de selva suave -->
+    <audio id="ambient-sound" loop>
+        <source src="https://actions.google.com/sounds/v1/ambiences/jungle_atmosphere_late_night.ogg" type="audio/ogg">
+        Tu navegador no soporta audio.
+    </audio>
+
+    <div class="audio-control" id="audio-toggle" title="Activar Sonido Ambiente">
+        🔇
+    </div>
+
+    <header class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1 class="fade-in-up">Kinich</h1>
+            <p class="subtitle fade-in-up delay-1">Alma y Sabor de Yucatán</p>
+            <a href="#recetas" class="btn-primary fade-in-up delay-2">Explorar Menú</a>
+        </div>
+    </header>
+
+    <main id="recetas" class="container">
+        <div class="section-header">
+            <h2>Nuestras Creaciones</h2>
+            <div class="divider"></div>
+            <p style="margin-top: 1rem; color: #888;">Pasa el cursor para descubrir los secretos</p>
+        </div>
+
+        <div id="recetas-grid" class="cards-grid">
+            <!-- Las tarjetas se inyectarán aquí con JS -->
+            <div class="loading">Preparando ingredientes...</div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Restaurante Kinich. Una experiencia para los sentidos.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
