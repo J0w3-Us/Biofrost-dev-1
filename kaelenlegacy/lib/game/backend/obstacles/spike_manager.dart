@@ -16,9 +16,9 @@ class SpikeCreateResult {
 
 /// Creates spike components (static + homing) given the image and pixel data.
 SpikeCreateResult createSpikesForScene({
-  required Sprite spikeSprite,
-  required Vector2 spikeNatural,
-  required Uint8List spikePixels,
+  Sprite? spikeSprite,
+  Vector2? spikeNatural,
+  Uint8List? spikePixels,
   required double visibleTop,
   required double groundHeight,
   required double canvasWidth,
@@ -26,16 +26,19 @@ SpikeCreateResult createSpikesForScene({
 }) {
   final List<Spike> spikes = [];
   final List<HomingSpike> homing = [];
-
   // Precompute alpha mask for the spike sprite (1 = opaque, 0 = transparent)
-  final int imgW = spikeNatural.x.toInt();
-  final int imgH = spikeNatural.y.toInt();
+  final int imgW = (spikeNatural?.x ?? 32.0).toInt();
+  final int imgH = (spikeNatural?.y ?? 32.0).toInt();
   final Uint8List alphaMask = Uint8List(imgW * imgH);
-  for (int y = 0; y < imgH; y++) {
-    for (int x = 0; x < imgW; x++) {
-      final idx = (y * imgW + x) * 4;
-      alphaMask[y * imgW + x] = spikePixels[idx + 3] > 10 ? 1 : 0;
+  if (spikePixels != null && spikePixels.length >= imgW * imgH * 4) {
+    for (int y = 0; y < imgH; y++) {
+      for (int x = 0; x < imgW; x++) {
+        final idx = (y * imgW + x) * 4;
+        alphaMask[y * imgW + x] = spikePixels[idx + 3] > 10 ? 1 : 0;
+      }
     }
+  } else {
+    // no pixel data: leave alphaMask as all zeros
   }
 
   final double playerJumpSpeed = 420.0;
@@ -46,8 +49,8 @@ SpikeCreateResult createSpikesForScene({
     groundHeight * 0.5,
     maxJump * 0.6,
   )).clamp(20.0, groundHeight);
-  final double spikeScale = spikeHeight / spikeNatural.y;
-  final double spikeWidth = spikeNatural.x * spikeScale;
+  final double spikeScale = spikeHeight / (spikeNatural?.y ?? imgH.toDouble());
+  final double spikeWidth = (spikeNatural?.x ?? imgW.toDouble()) * spikeScale;
 
   // Decide positions either from explicit config spikePositions, or by
   // spreading `numSpikes` across the canvas width. Keep a margin on both
@@ -96,7 +99,7 @@ SpikeCreateResult createSpikesForScene({
         anchor: Anchor.bottomCenter,
         pixels: spikePixels,
         alphaMask: alphaMask,
-        naturalSize: spikeNatural,
+        naturalSize: spikeNatural ?? Vector2(imgW.toDouble(), imgH.toDouble()),
       );
       spikes.add(spike);
     }
@@ -162,10 +165,13 @@ class SpikeManager extends Component with HasGameRef {
                   ? (item['height'] as num).toDouble()
                   : null;
 
-              if (type == 'spike' && x != null) {
+              if ((type == 'spike' ||
+                      type == 'pincho' ||
+                      type == 'pincho_oculto') &&
+                  x != null) {
                 final size = Vector2(
-                  w ?? (spikeNatural?.x ?? 32),
-                  h ?? (spikeNatural?.y ?? 32),
+                  (w ?? spikeNatural?.x ?? 32.0).toDouble(),
+                  (h ?? spikeNatural?.y ?? 32.0).toDouble(),
                 );
                 final s = Spike(
                   sprite: spikeSprite,
@@ -180,7 +186,8 @@ class SpikeManager extends Component with HasGameRef {
                   naturalSize: spikeNatural ?? Vector2(32, 32),
                 );
                 gameRef.add(s);
-              } else if (type == 'homing' && x != null) {
+              } else if ((type == 'homing' || type == 'homing_spike') &&
+                  x != null) {
                 final hs = HomingSpike(
                   target: null,
                   speed: (item['speed'] is num)
@@ -192,8 +199,8 @@ class SpikeManager extends Component with HasGameRef {
                   sprite: spikeSprite,
                   position: Vector2(x, visibleTop),
                   size: Vector2(
-                    w ?? (spikeNatural?.x ?? 32),
-                    h ?? (spikeNatural?.y ?? 32),
+                    (w ?? spikeNatural?.x ?? 32.0).toDouble(),
+                    (h ?? spikeNatural?.y ?? 32.0).toDouble(),
                   ),
                   anchor: Anchor.bottomCenter,
                 );
@@ -211,10 +218,9 @@ class SpikeManager extends Component with HasGameRef {
 
       // Fallback: use scene builder logic when backend provided no data
       final res = createSpikesForScene(
-        spikeSprite:
-            spikeSprite ?? Sprite(gameRef.images.fromCache('pinchos.png')),
-        spikeNatural: spikeNatural ?? Vector2(32, 32),
-        spikePixels: spikePixels ?? Uint8List(0),
+        spikeSprite: spikeSprite,
+        spikeNatural: spikeNatural,
+        spikePixels: spikePixels,
         visibleTop: visibleTop,
         groundHeight: groundHeight,
         canvasWidth: canvasWidth,
@@ -231,5 +237,13 @@ class SpikeManager extends Component with HasGameRef {
     } catch (e) {
       debugPrint('⚠️ Error en carga de nivel: $e');
     }
+  }
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    // If runner_game doesn't call loadLevelData explicitly, ensure we still
+    // attempt to load the level config from backend here.
+    await loadLevelData(1);
   }
 }

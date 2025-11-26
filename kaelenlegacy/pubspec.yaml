@@ -30,6 +30,7 @@ flutter:
   assets:
     - assets/videos/
     - assets/images/
+    - assets/snippet/Kaelen.png
     - assets/fonts/
   fonts:
     - family: Cinzel

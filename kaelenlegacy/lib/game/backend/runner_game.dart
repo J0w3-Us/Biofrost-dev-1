@@ -46,41 +46,77 @@ class RunnerGame extends FlameGame with TapCallbacks implements GameApi {
     // Load ground/map image. If it fails, don't throw: provide a simple
     // fallback ground so the game can continue in local testing.
     try {
-      await images.load('map.png');
-      _groundImage = images.fromCache('map.png');
-      if (_groundImage != null) {
+      // Try a couple of candidate names to accommodate different asset names
+      final mapCandidates = ['map.png', 'Map.png'];
+      ui.Image? gimg;
+      for (final k in mapCandidates) {
+        try {
+          await images.load(k);
+          gimg = images.fromCache(k);
+          if (gimg != null) break;
+        } catch (_) {
+          // try next
+        }
+      }
+      if (gimg != null) {
+        _groundImage = gimg;
         _groundTopTrim = await _computeTopNonTransparent(_groundImage!);
       } else {
+        _groundImage = null;
         _groundTopTrim = 0;
-        debugPrint('⚠️ map.png loaded but fromCache returned null');
+        debugPrint('⚠️ Could not load any map image from candidates');
+        groundHeight = 120.0;
       }
     } catch (e) {
-      // Don't rethrow: we want to allow the game to continue without map.png
-      debugPrint('⚠️ Could not load assets/images/map.png: $e');
+      debugPrint('⚠️ Could not load map image: $e');
       _groundImage = null;
       _groundTopTrim = 0;
-      // Provide a safe default ground height so later logic doesn't crash.
       groundHeight = 120.0;
     }
 
     try {
-      await images.load('pinchos.png');
-      _spikeImage = images.fromCache('pinchos.png');
-      final bd = await _spikeImage!.toByteData(
-        format: ui.ImageByteFormat.rawRgba,
-      );
-      _spikePixels = bd?.buffer.asUint8List();
+      final spikeCandidates = ['pinchos.png', 'spikes.png'];
+      ui.Image? sImg;
+      for (final k in spikeCandidates) {
+        try {
+          await images.load(k);
+          sImg = images.fromCache(k);
+          if (sImg != null) break;
+        } catch (_) {}
+      }
+      if (sImg != null) {
+        _spikeImage = sImg;
+        final bd = await _spikeImage!.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        _spikePixels = bd?.buffer.asUint8List();
+      } else {
+        _spikeImage = null;
+      }
     } catch (_) {
       _spikeImage = null;
     }
 
     try {
-      await images.load('puerta.png');
-      _doorImage = images.fromCache('puerta.png');
-      final bd2 = await _doorImage!.toByteData(
-        format: ui.ImageByteFormat.rawRgba,
-      );
-      _doorPixels = bd2?.buffer.asUint8List();
+      final doorCandidates = ['puerta.png', 'door.png'];
+      ui.Image? dImg;
+      for (final k in doorCandidates) {
+        try {
+          await images.load(k);
+          dImg = images.fromCache(k);
+          if (dImg != null) break;
+        } catch (_) {}
+      }
+      if (dImg != null) {
+        _doorImage = dImg;
+        final bd2 = await _doorImage!.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        _doorPixels = bd2?.buffer.asUint8List();
+      } else {
+        _doorImage = null;
+        _doorPixels = null;
+      }
     } catch (_) {
       _doorImage = null;
       _doorPixels = null;
@@ -251,10 +287,14 @@ class RunnerGame extends FlameGame with TapCallbacks implements GameApi {
       gameState = GameState.gameOver;
       overlays.add('GameOver');
       pauseEngine();
-      // Report death to backend but do not await to avoid blocking game loop.
-      try {
-        GameApiClient.recordDeath();
-      } catch (_) {}
+      // Report death to backend (best-effort) via GameApiClient.
+      () async {
+        try {
+          await GameApiClient.recordDeath();
+        } catch (e) {
+          debugPrint('⚠️ GameApiClient.recordDeath failed: $e');
+        }
+      }();
     }
   }
 
