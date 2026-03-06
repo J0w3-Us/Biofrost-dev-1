@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "1008422112612",
+    "project_id": "integradorhub-dsm",
+    "storage_bucket": "integradorhub-dsm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008422112612:android:d783dfa638574b79e3be71",
+        "android_client_info": {
+          "package_name": "com.example.biofrost_aplication_movil"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1008422112612-7hb144eb6ire3omlr5eo6nu9akpt71ha.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUMSRJ0Qe6hnEc-1ddIoYlTUwzfHflEZc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1008422112612-7hb144eb6ire3omlr5eo6nu9akpt71ha.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1008422112612-i465blesff8uqs8u2tb06il7got21r85.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.biofrostAplicationMovil"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
