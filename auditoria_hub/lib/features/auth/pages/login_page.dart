@@ -70,7 +70,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         barrierDismissible: false,
       );
     } else if (authState is AuthError) {
-      setState(() => _errorMsg = authState.message);
+      final msg = authState.message;
+      // Diferenciar errores para dar un mensaje claro al usuario
+      if (msg.contains('NetworkException') || msg.contains('network')) {
+        setState(() => _errorMsg =
+            'Sin conexión. Verifica tu internet e intenta de nuevo.');
+      } else if (msg.contains('TimeoutException') || msg.contains('timeout')) {
+        setState(() => _errorMsg =
+            'El servidor tardó en responder (primera conexión del día). Espera unos segundos e intenta de nuevo.');
+      } else {
+        setState(() => _errorMsg = msg);
+      }
     }
   }
 
@@ -248,6 +258,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                         ],
                         const SizedBox(height: 28),
+                        // Aviso de cold-start cuando el servidor puede estar dormido
+                        if (_isLoading) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'La primera conexión del día puede tardar hasta 60 s mientras el servidor despierta.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightMutedFg,
+                            ),
+                          ),
+                        ],
                         BioButton(
                           label: 'Iniciar sesión',
                           isLoading: _isLoading,

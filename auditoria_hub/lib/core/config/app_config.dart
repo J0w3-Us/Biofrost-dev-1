@@ -1,4 +1,5 @@
 // core/config/app_config.dart — Configuracion por entorno
+// Para cambiar el entorno activo, sobrescribe appEnvironmentProvider en main_xxx.dart
 enum AppEnvironment { development, staging, production }
 
 class AppConfig {

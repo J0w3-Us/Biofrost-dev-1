@@ -32,21 +32,46 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: authNotifier,
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
-      final isAuthenticated = authState is AuthAuthenticated;
-      final isGoingToLogin = state.matchedLocation == '/login';
+      final currentLocation = state.matchedLocation;
 
-      if (!isAuthenticated && !isGoingToLogin) {
-        final isPublic = _publicRoutes.any(
-          (r) => state.matchedLocation.startsWith(r),
-        );
-        if (!isPublic) return '/login';
+      // Casos de redirección mejorados:
+      switch (authState) {
+        case AuthLoading():
+          // Durante carga, permitir solo splash
+          if (currentLocation != '/splash') return '/splash';
+          break;
+
+        case AuthUnauthenticated():
+          // Sin autenticar: permitir rutas públicas o redirigir a login
+          final isPublic =
+              _publicRoutes.any((r) => currentLocation.startsWith(r));
+          if (!isPublic) return '/login';
+          break;
+
+        case AuthAuthenticated(isFirstLogin: true):
+          // Usuario autenticado pero necesita completar perfil
+          // Por ahora redirigir a showcase, más adelante implementar complete-profile
+          if (currentLocation == '/login' || currentLocation == '/splash') {
+            return '/showcase';
+          }
+          break;
+
+        case AuthAuthenticated():
+          // Usuario autenticado y perfil completo
+          if (currentLocation == '/login' || currentLocation == '/splash') {
+            return '/showcase'; // Dashboard principal
+          }
+          break;
+
+        case AuthError():
+          // Error de autenticación → volver al login
+          if (currentLocation != '/login' && currentLocation != '/splash') {
+            return '/login';
+          }
+          break;
       }
 
-      if (isAuthenticated && isGoingToLogin) {
-        return '/showcase';
-      }
-
-      return null;
+      return null; // No hay redirección necesaria
     },
     routes: [
       // ── Splash ───────────────────────────────────────────────────────
