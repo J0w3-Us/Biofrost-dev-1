@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/api_endpoints.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/form_label.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../domain/commands/login_command.dart';
 import '../domain/models/auth_state.dart';
@@ -41,19 +44,101 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _isLoading = false;
   String? _errorMsg;
 
-  // Detectar rol en tiempo real
-  String get _detectedRole => RoleDetector.fromEmail(_emailCtrl.text);
+  // ── Step 2 — Asignación docente ─────────────────────────────────────────
+  int _registerStep = 1;
+  List<Map<String, dynamic>> _carreras = [];
+  List<Map<String, dynamic>> _availableMaterias = [];
+  String? _selectedCarreraId;
+  String? _selectedMateriaId;
+  List<String> _selectedGruposIds = [];
+  bool _loadingCatalogs = false;
+
+  // Cache de detección de rol para evitar lookups excesivos
+  String _cachedDetectedRole = 'Invitado';
+  String _lastEmailChecked = '';
+
+  String get _detectedRole {
+    if (_emailCtrl.text != _lastEmailChecked) {
+      _lastEmailChecked = _emailCtrl.text;
+      _cachedDetectedRole = RoleDetector.fromEmail(_emailCtrl.text);
+    }
+    return _cachedDetectedRole;
+  }
+
   bool get _isGuest => _detectedRole == 'Invitado';
   bool get _isTeacher => _detectedRole == 'Docente';
 
   @override
   void initState() {
     super.initState();
-    _emailCtrl.addListener(() => setState(() {}));
+    // Optimizar listener con debounce para evitar rebuilds excesivos
+    _emailCtrl.addListener(_onEmailChanged);
+  }
+
+  void _onEmailChanged() {
+    // Solo actualizar UI si el rol realmente cambió
+    final newRole = RoleDetector.fromEmail(_emailCtrl.text);
+    if (newRole != _cachedDetectedRole) {
+      setState(() {
+        _cachedDetectedRole = newRole;
+        _lastEmailChecked = _emailCtrl.text;
+      });
+    }
+  }
+
+  Future<void> _loadCarreras() async {
+    setState(() => _loadingCatalogs = true);
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(ApiEndpoints.adminCarreras);
+      final list = (response.data as List).cast<Map<String, dynamic>>();
+      if (mounted) setState(() => _carreras = list);
+    } catch (_) {
+      // fallback silencioso
+    } finally {
+      if (mounted) setState(() => _loadingCatalogs = false);
+    }
+  }
+
+  Future<void> _onCarreraChanged(String? carreraId) async {
+    setState(() {
+      _selectedCarreraId = carreraId;
+      _selectedMateriaId = null;
+      _selectedGruposIds = [];
+      _availableMaterias = [];
+      _loadingCatalogs = carreraId != null;
+    });
+    if (carreraId == null) return;
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get(
+        '${ApiEndpoints.adminMaterias}/available',
+        queryParameters: {'carreraId': carreraId},
+      );
+      final list = (response.data as List).cast<Map<String, dynamic>>();
+      if (mounted) setState(() => _availableMaterias = list);
+    } catch (_) {
+      // fallback silencioso
+    } finally {
+      if (mounted) setState(() => _loadingCatalogs = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _gruposDeMateria {
+    if (_selectedMateriaId == null) return [];
+    for (final entry in _availableMaterias) {
+      final mat = entry['materia'] as Map<String, dynamic>?;
+      if (mat?['id'] == _selectedMateriaId) {
+        return (entry['gruposDisponibles'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
+      }
+    }
+    return [];
   }
 
   @override
   void dispose() {
+    _emailCtrl.removeListener(_onEmailChanged);
     _nameCtrl.dispose();
     _apellidoPaternoCtrl.dispose();
     _apellidoMaternoCtrl.dispose();
@@ -66,7 +151,37 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   Future<void> _submitRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+    // ── Step 2: validación manual de la cascada ─────────────────────────────
+    if (_isTeacher && _registerStep == 2) {
+      setState(() => _errorMsg = null);
+      if (_selectedCarreraId == null) {
+        setState(() => _errorMsg = 'Selecciona tu carrera');
+        return;
+      }
+      if (_selectedMateriaId == null) {
+        setState(() => _errorMsg = 'Selecciona la materia que impartes');
+        return;
+      }
+      if (_selectedGruposIds.isEmpty) {
+        setState(() => _errorMsg = 'Selecciona al menos un grupo');
+        return;
+      }
+    } else {
+      // ── Step 1: validación del formulario ────────────────────────────────
+      if (!_formKey.currentState!.validate()) return;
+
+      // Docente: avanzar al Step 2 para asignación de grupos
+      if (_isTeacher) {
+        FocusScope.of(context).unfocus();
+        await _loadCarreras();
+        setState(() {
+          _registerStep = 2;
+          _errorMsg = null;
+        });
+        return;
+      }
+    }
+
     FocusScope.of(context).unfocus();
     setState(() {
       _isLoading = true;
@@ -91,8 +206,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
             : null,
-        carrerasIds: const [],
-        gruposDocente: const [],
+        carrerasIds: _isTeacher && _selectedCarreraId != null
+            ? [_selectedCarreraId!]
+            : const [],
+        gruposDocente: _isTeacher ? _selectedGruposIds : const [],
       );
 
       await ref.read(authStateProvider.notifier).register(cmd);
@@ -157,7 +274,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       top: topPad + 12,
                       left: 16,
                       child: GestureDetector(
-                        onTap: () => context.go('/login'),
+                        onTap: () {
+                          if (_isTeacher && _registerStep == 2) {
+                            setState(() {
+                              _registerStep = 1;
+                              _errorMsg = null;
+                            });
+                          } else {
+                            context.go('/login');
+                          }
+                        },
                         child: Container(
                           width: 36,
                           height: 36,
@@ -175,9 +301,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Crear cuenta',
-                            style: TextStyle(
+                          Text(
+                            _isTeacher && _registerStep == 2
+                                ? 'Asignación docente'
+                                : 'Crear cuenta',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
@@ -187,7 +315,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Auditoría Hub · UTM',
+                            _isTeacher && _emailCtrl.text.isNotEmpty
+                                ? 'Paso $_registerStep de 2 · UTM'
+                                : 'Evaluacion de proyectos · UTM',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 13,
@@ -204,202 +334,371 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               // ── Formulario — sin bordes, full-width ─────────────────────
               Container(
                 color: isDark ? AppColors.darkSurface1 : Colors.white,
-                padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ── Nombre ──────────────────────────────────────────
-                      _FieldLabel('Nombre *', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _nameCtrl,
-                        textInputAction: TextInputAction.next,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          hintText: 'Tu nombre',
-                          prefixIcon:
-                              Icon(Icons.person_outline_rounded, size: 18),
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Ingresa tu nombre'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Apellido Paterno ────────────────────────────────
-                      _FieldLabel('Apellido Paterno', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _apellidoPaternoCtrl,
-                        textInputAction: TextInputAction.next,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          hintText: 'Apellido paterno (opcional)',
-                          prefixIcon: Icon(Icons.person_2_outlined, size: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Apellido Materno ────────────────────────────────
-                      _FieldLabel('Apellido Materno', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _apellidoMaternoCtrl,
-                        textInputAction: TextInputAction.next,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          hintText: 'Apellido materno (opcional)',
-                          prefixIcon: Icon(Icons.person_3_outlined, size: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Correo ──────────────────────────────────────────
-                      _FieldLabel('Correo electrónico *', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          hintText: 'correo@institucion.edu',
-                          prefixIcon:
-                              const Icon(Icons.email_outlined, size: 18),
-                          suffixIcon: _emailCtrl.text.isNotEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _getRoleColor(_detectedRole)
-                                          .withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                        color: _getRoleColor(_detectedRole)
-                                            .withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      _detectedRole,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                        color: _getRoleColor(_detectedRole),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : null,
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty)
-                            return 'Ingresa tu correo';
-                          if (!v.contains('@')) return 'Correo inválido';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Profesión — solo Docentes ────────────────────────
-                      if (_isTeacher) ...[
-                        _FieldLabel('Profesión', isDark: isDark),
+                      // ── STEP 1: Datos personales ─────────────────────────────────
+                      if (_registerStep == 1) ...[
+                        // ── Nombre ──────────────────────────────────────────
+                        _FieldLabel('Nombre *', isDark: isDark),
                         const SizedBox(height: 6),
                         TextFormField(
-                          controller: _profesionCtrl,
+                          controller: _nameCtrl,
                           textInputAction: TextInputAction.next,
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
-                            hintText: 'Ej: Ingeniero en Sistemas',
+                            hintText: 'Tu nombre',
                             prefixIcon:
-                                Icon(Icons.work_outline_rounded, size: 18),
+                                Icon(Icons.person_outline_rounded, size: 18),
                           ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Ingresa tu nombre'
+                              : null,
                         ),
-                        const SizedBox(height: 16),
-                      ],
+                        const SizedBox(height: 12),
 
-                      // ── Contraseña ───────────────────────────────────────
-                      _FieldLabel('Contraseña *', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _passCtrl,
-                        obscureText: _obscurePass,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          hintText: 'Mínimo 6 caracteres',
-                          prefixIcon:
-                              const Icon(Icons.lock_outline_rounded, size: 18),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePass
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 18,
+                        // ── Apellidos — dos columnas ─────────────────────────
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _FieldLabel('Ap. Paterno', isDark: isDark),
+                                  const SizedBox(height: 6),
+                                  TextFormField(
+                                    controller: _apellidoPaternoCtrl,
+                                    textInputAction: TextInputAction.next,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Paterno',
+                                      prefixIcon: Icon(Icons.person_2_outlined,
+                                          size: 16),
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            onPressed: () =>
-                                setState(() => _obscurePass = !_obscurePass),
-                          ),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty)
-                            return 'Ingresa una contraseña';
-                          if (v.length < 6) return 'Mínimo 6 caracteres';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Confirmar contraseña ─────────────────────────────
-                      _FieldLabel('Confirmar contraseña *', isDark: isDark),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _confirmCtrl,
-                        obscureText: _obscureConfirm,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          hintText: 'Repite tu contraseña',
-                          prefixIcon:
-                              const Icon(Icons.lock_outline_rounded, size: 18),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirm
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 18,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _FieldLabel('Ap. Materno', isDark: isDark),
+                                  const SizedBox(height: 6),
+                                  TextFormField(
+                                    controller: _apellidoMaternoCtrl,
+                                    textInputAction: TextInputAction.next,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Materno',
+                                      prefixIcon: Icon(Icons.person_3_outlined,
+                                          size: 16),
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            onPressed: () => setState(
-                                () => _obscureConfirm = !_obscureConfirm),
-                          ),
+                          ],
                         ),
-                        validator: (v) {
-                          if (v != _passCtrl.text)
-                            return 'Las contraseñas no coinciden';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 12),
 
-                      // ── Organización — solo invitados ─────────────────────
-                      if (_isGuest) ...[
-                        _FieldLabel('Organización', isDark: isDark),
+                        // ── Correo ──────────────────────────────────────────
+                        _FieldLabel('Correo electrónico *', isDark: isDark),
                         const SizedBox(height: 6),
                         TextFormField(
-                          controller: _orgCtrl,
-                          textInputAction: TextInputAction.done,
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
-                            hintText: 'Institución u organización (opcional)',
-                            prefixIcon: Icon(Icons.business_outlined, size: 18),
+                            hintText: 'correo@institucion.edu',
+                            prefixIcon: Icon(Icons.email_outlined, size: 18),
                           ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty)
+                              return 'Ingresa tu correo';
+                            if (!v.contains('@')) return 'Correo inválido';
+                            return null;
+                          },
+                        ),
+
+                        // ── Role badge — aparece al detectar rol ─────────────
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeInOut,
+                          child: _emailCtrl.text.isNotEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: _RoleBadge(
+                                    role: _detectedRole,
+                                    isDark: isDark,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+
+                        // ── Profesión — solo Docentes ────────────────────────
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeInOut,
+                          child: _emailCtrl.text.isNotEmpty && _isTeacher
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _FieldLabel('Profesión', isDark: isDark),
+                                      const SizedBox(height: 6),
+                                      TextFormField(
+                                        controller: _profesionCtrl,
+                                        textInputAction: TextInputAction.next,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        decoration: const InputDecoration(
+                                          hintText: 'Ej: Ingeniero en Sistemas',
+                                          prefixIcon: Icon(
+                                              Icons.work_outline_rounded,
+                                              size: 18),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Contraseña ───────────────────────────────────────
+                        _FieldLabel('Contraseña *', isDark: isDark),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: _passCtrl,
+                          obscureText: _obscurePass,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            hintText: 'Mínimo 6 caracteres',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded,
+                                size: 18),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePass
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 18,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscurePass = !_obscurePass),
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty)
+                              return 'Ingresa una contraseña';
+                            if (v.length < 6) return 'Mínimo 6 caracteres';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Confirmar contraseña ─────────────────────────────
+                        _FieldLabel('Confirmar contraseña *', isDark: isDark),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: _confirmCtrl,
+                          obscureText: _obscureConfirm,
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(
+                            hintText: 'Repite tu contraseña',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded,
+                                size: 18),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirm
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 18,
+                              ),
+                              onPressed: () => setState(
+                                  () => _obscureConfirm = !_obscureConfirm),
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v != _passCtrl.text)
+                              return 'Las contraseñas no coinciden';
+                            return null;
+                          },
                           onFieldSubmitted: (_) => _submitRegister(),
                         ),
-                        const SizedBox(height: 16),
-                      ],
+
+                        // ── Organización — solo invitados ─────────────────────
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeInOut,
+                          child: _emailCtrl.text.isNotEmpty && _isGuest
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _FieldLabel('Organización',
+                                          isDark: isDark),
+                                      const SizedBox(height: 6),
+                                      TextFormField(
+                                        controller: _orgCtrl,
+                                        textInputAction: TextInputAction.done,
+                                        decoration: const InputDecoration(
+                                          hintText:
+                                              'Institución u organización (opcional)',
+                                          prefixIcon: Icon(
+                                              Icons.business_outlined,
+                                              size: 18),
+                                        ),
+                                        onFieldSubmitted: (_) =>
+                                            _submitRegister(),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ], // end step 1
+
+                      // ── STEP 2: Asignación docente ─────────────────────────────────
+                      if (_isTeacher && _registerStep == 2) ...[
+                        // ── Carrera ───────────────────────────────────────
+                        _FieldLabel('Carrera *', isDark: isDark),
+                        const SizedBox(height: 6),
+                        if (_loadingCatalogs && _carreras.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            value: _selectedCarreraId,
+                            hint: const Text('Selecciona tu carrera'),
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.school_rounded, size: 18),
+                            ),
+                            items: _carreras
+                                .map((c) => DropdownMenuItem<String>(
+                                      value: c['id'] as String?,
+                                      child: Text(c['nombre'] as String? ?? ''),
+                                    ))
+                                .toList(),
+                            onChanged: _onCarreraChanged,
+                          ),
+                        const SizedBox(height: 12),
+
+                        // ── Materia ───────────────────────────────────────
+                        _FieldLabel('Materia *', isDark: isDark),
+                        const SizedBox(height: 6),
+                        if (_loadingCatalogs && _selectedCarreraId != null)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            value: _selectedMateriaId,
+                            hint: Text(
+                              _selectedCarreraId == null
+                                  ? 'Elige una carrera primero'
+                                  : 'Selecciona la materia que impartes',
+                            ),
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.book_outlined, size: 18),
+                            ),
+                            items: _availableMaterias.map((entry) {
+                              final m =
+                                  entry['materia'] as Map<String, dynamic>? ??
+                                      {};
+                              return DropdownMenuItem<String>(
+                                value: m['id'] as String?,
+                                child: Text(
+                                  '${m['nombre'] ?? ''} '
+                                  '(${m['cuatrimestre'] ?? ''}°)',
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: _selectedCarreraId == null
+                                ? null
+                                : (val) => setState(() {
+                                      _selectedMateriaId = val;
+                                      _selectedGruposIds = [];
+                                    }),
+                          ),
+                        const SizedBox(height: 12),
+
+                        // ── Grupos ─────────────────────────────────────────
+                        if (_selectedMateriaId != null &&
+                            _gruposDeMateria.isNotEmpty) ...[
+                          _FieldLabel('Grupos *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.darkSurface0
+                                  : AppColors.lightBackground,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.lightBorder,
+                              ),
+                            ),
+                            child: Column(
+                              children: _gruposDeMateria.map((g) {
+                                final gId = g['id'] as String? ?? '';
+                                final turno = g['turno'] as String? ?? '';
+                                return CheckboxListTile(
+                                  value: _selectedGruposIds.contains(gId),
+                                  title: Text(
+                                    '${g["nombre"] ?? ""}'
+                                    '${turno.isNotEmpty ? "  ·  $turno" : ""}',
+                                    style: const TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  dense: true,
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  onChanged: (checked) => setState(() {
+                                    if (checked == true) {
+                                      if (!_selectedGruposIds.contains(gId)) {
+                                        _selectedGruposIds.add(gId);
+                                      }
+                                    } else {
+                                      _selectedGruposIds.remove(gId);
+                                    }
+                                  }),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ], // end step 2
 
                       // ── Error ────────────────────────────────────────
                       if (_errorMsg != null) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -425,13 +724,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         ),
                       ],
 
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
                       BioButton(
-                        label: 'Crear cuenta',
-                        isLoading: _isLoading,
+                        label: _isTeacher && _registerStep == 1
+                            ? 'Continuar →'
+                            : 'Crear cuenta',
+                        isLoading: _isLoading || _loadingCatalogs,
                         onPressed: _submitRegister,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       TextButton(
                         onPressed: () => context.go('/login'),
                         child: const Text('¿Ya tienes cuenta? Inicia sesión'),
@@ -449,21 +750,91 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 }
 
 // ── Subwidgets ──────────────────────────────────────────────────────────────
+// Alias local para mantener compat con el widget tree existente
+typedef _FieldLabel = FormLabel;
 
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text, {required this.isDark});
-  final String text;
+// ── Role badge — tarjeta de rol detectado ─────────────────────────────────
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.role, required this.isDark});
+  final String role;
   final bool isDark;
+
+  IconData get _icon => switch (role) {
+        'Docente' => Icons.school_rounded,
+        'Alumno' => Icons.person_rounded,
+        'SuperAdmin' => Icons.admin_panel_settings_rounded,
+        _ => Icons.business_center_rounded,
+      };
+
+  String get _description => switch (role) {
+        'Docente' => 'Correo docente UTM — acceso al panel de enseñanza',
+        'Alumno' => 'Correo alumno UTM — acceso a proyectos y evaluaciones',
+        'SuperAdmin' => 'Cuenta de administrador — acceso total al sistema',
+        _ => 'Correo externo — acceso como invitado',
+      };
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+    final color = _getRoleColor(role);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      transitionBuilder: (child, anim) =>
+          FadeTransition(opacity: anim, child: child),
+      child: Container(
+        key: ValueKey(role),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: isDark ? color.withAlpha(18) : color.withAlpha(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: color.withAlpha(50)),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // Barra lateral de acento
+              Container(width: 4, color: color),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Icon(_icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        role,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _description,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightMutedFg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+          ),
+        ),
       ),
     );
   }

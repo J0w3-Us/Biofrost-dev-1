@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/models/auth_state.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../theme/app_theme.dart';
+import 'ui_kit.dart';
 
 class ShellScaffold extends ConsumerWidget {
   const ShellScaffold({super.key, required this.child, required this.location});
@@ -17,6 +19,7 @@ class ShellScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
     final isAuth = auth is AuthAuthenticated;
+    final isTeacher = auth is AuthAuthenticated && auth.isTeacher;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final tabs = [
@@ -32,6 +35,13 @@ class ShellScaffold extends ConsumerWidget {
         label: 'Ranking',
         route: '/ranking',
       ),
+      if (isTeacher)
+        _NavTab(
+          icon: Icons.assignment_outlined,
+          iconActive: Icons.assignment_rounded,
+          label: 'Evaluar',
+          route: '/dashboard',
+        ),
       if (isAuth)
         _NavTab(
           icon: Icons.person_outline_rounded,
@@ -62,8 +72,15 @@ class ShellScaffold extends ConsumerWidget {
     // Both modes share a dark nav background, so use zinc-400 for inactive items
     final inactiveColor = AppColors.darkTextSecondary;
 
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Scaffold(
-      body: child,
+      body: Column(
+        children: [
+          OfflineBanner(visible: !isOnline),
+          Expanded(child: child),
+        ],
+      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

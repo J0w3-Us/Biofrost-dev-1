@@ -10,6 +10,9 @@ import 'firebase_options.dart';
 
 typedef AppBuilder = Widget Function();
 
+// Overrides de Riverpod inyectados por cada punto de entrada (main_xxx.dart)
+typedef ProviderOverrides = List<Override>;
+
 /// URL de producción que puede estar durmiendo en Render free tier
 const _renderPingUrl = 'https://integradorhub.onrender.com/api/health';
 
@@ -33,16 +36,22 @@ void _warmupApi() {
 
 Future<void> bootstrap(
   AppBuilder builder, {
-  List<Override> overrides = const [],
+  ProviderOverrides overrides = const [],
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Despertar API de Render en paralelo, sin bloquear la inicialización
   _warmupApi();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  if (Firebase.apps.isEmpty) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') rethrow;
+    }
+  }
   await NotificationService.instance.initialize();
 
   runApp(

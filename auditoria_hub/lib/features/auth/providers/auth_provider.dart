@@ -61,6 +61,31 @@ class AuthNotifier extends Notifier<AuthState> implements ChangeNotifier {
     }
   }
 
+  /// Actualiza el photoUrl en el estado local tras una subida exitosa.
+  void updatePhotoInState(String photoUrl) {
+    final current = state;
+    if (current is! AuthAuthenticated) return;
+    state = AuthAuthenticated(
+      uid: current.uid,
+      email: current.email,
+      displayName: current.displayName,
+      role: current.role,
+      photoUrl: photoUrl,
+      isFirstLogin: current.isFirstLogin,
+      grupoId: current.grupoId,
+      grupoNombre: current.grupoNombre,
+      matricula: current.matricula,
+      carreraId: current.carreraId,
+      apellidoPaterno: current.apellidoPaterno,
+      apellidoMaterno: current.apellidoMaterno,
+      profesion: current.profesion,
+      organizacion: current.organizacion,
+      especialidadDocente: current.especialidadDocente,
+      createdAt: current.createdAt,
+    );
+    notifyListeners();
+  }
+
   /// Cerrar sesion
   Future<void> logout() async {
     await _datasource.logout();

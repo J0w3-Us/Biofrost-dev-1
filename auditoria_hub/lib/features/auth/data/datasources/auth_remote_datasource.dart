@@ -9,15 +9,15 @@ import '../../../../core/services/api_service.dart';
 import '../../domain/commands/login_command.dart';
 import '../../domain/models/auth_state.dart';
 
+final _logger = Logger();
+
 class AuthRemoteDatasource {
   AuthRemoteDatasource(this._dio);
 
   final Dio _dio;
   final _firebaseAuth = FirebaseAuth.instance;
-  final _logger = Logger();
 
   /// RF-01: Login — Firebase Auth + llamada directa al backend (sin JWT)
-  /// Mismo flujo que el frontend web: Firebase → POST /api/auth/login con UID
   Future<AuthAuthenticated> login(LoginCommand cmd) async {
     try {
       // 1. Firebase Auth
@@ -26,9 +26,8 @@ class AuthRemoteDatasource {
         password: cmd.password,
       );
       final user = cred.user!;
-      _logger.i('Firebase Auth OK: ${user.uid}');
 
-      // 2. Backend: registrar/sincronizar sesión usando Firebase UID
+      // 2. Llamar al backend con datos de Firebase
       final res = await _dio.post(
         ApiEndpoints.login,
         data: {
@@ -39,35 +38,31 @@ class AuthRemoteDatasource {
         },
       );
 
-      _logger.i('Backend login OK: status ${res.statusCode}');
-      return _parseLoginResponse(res.data as Map<String, dynamic>);
+      return _mapResponse(res.data as Map<String, dynamic>);
     } on FirebaseAuthException catch (e) {
-      _logger.w('FirebaseAuth error: ${e.code}');
+      _logger.w('Firebase login error: ${e.code} — ${e.message}');
       throw ValidationException(_mapFirebaseError(e.code));
     } on DioException catch (e) {
       _logger.e(
-        'Backend login error: ${e.type} — ${e.response?.statusCode}',
-        error: e.response?.data,
+        'Backend login error [${e.response?.statusCode}]',
+        error: e.response?.data ?? e.message,
       );
-      throw mapDioError(e);
+      throw handleDioError(e);
     }
   }
 
-  /// Cierra sesion
+  /// Cierra sesión
   Future<void> logout() async {
     await _firebaseAuth.signOut();
-    _logger.i('Sesión cerrada');
   }
 
-  /// Verifica si hay sesion activa al iniciar la app
+  /// Verifica si hay sesión activa al iniciar la app
   Future<AuthAuthenticated?> getActiveSession() async {
     try {
       final user = _firebaseAuth.currentUser;
-      if (user == null) {
-        _logger.i('getActiveSession: sin sesión Firebase activa');
-        return null;
-      }
-      _logger.i('getActiveSession: sesión encontrada para ${user.email}');
+      if (user == null) return null;
+
+      _logger.i('Verificando sesión activa para ${user.email}');
 
       final res = await _dio.post(
         ApiEndpoints.login,
@@ -80,23 +75,26 @@ class AuthRemoteDatasource {
         },
       );
 
-      _logger.i('getActiveSession: backend respondió ${res.statusCode}');
-      return _parseLoginResponse(res.data as Map<String, dynamic>);
+      return _mapResponse(res.data as Map<String, dynamic>);
+    } on FirebaseAuthException catch (e) {
+      _logger.w('Firebase session check error: ${e.code}');
+      return null;
     } on DioException catch (e) {
       _logger.w(
-        'getActiveSession: error de red [${e.type}] — ${e.response?.statusCode}',
-        error: e.message,
+        'Backend no disponible al verificar sesión [${e.type}]',
+        error: e.response?.data ?? e.message,
       );
       return null;
-    } catch (e) {
-      _logger.e('getActiveSession: error inesperado', error: e);
+    } catch (e, st) {
+      _logger.e('Error inesperado al verificar sesión',
+          error: e, stackTrace: st);
       return null;
     }
   }
 
   /// RF-02: Registro de nuevo usuario - Firebase + API
+  /// Si el backend falla, hace rollback eliminando el usuario de Firebase.
   Future<AuthAuthenticated> register(RegisterCommand cmd) async {
-    // user se guarda para poder hacer rollback si el backend falla
     User? firebaseUser;
     try {
       // 1. Crear cuenta en Firebase
@@ -105,9 +103,8 @@ class AuthRemoteDatasource {
         password: cmd.password,
       );
       firebaseUser = cred.user!;
-      _logger.i('Firebase register OK: ${firebaseUser.uid}');
 
-      // 2. Registrar en el backend con la misma estructura que el frontend web
+      // 2. Registrar en la API backend
       final res = await _dio.post(
         ApiEndpoints.register,
         data: {
@@ -124,81 +121,84 @@ class AuthRemoteDatasource {
         },
       );
 
-      // 3. Verificar éxito del backend
+      // 3. Verificar respuesta del backend (tolera PascalCase y camelCase)
       final data = res.data as Map<String, dynamic>;
-      final success =
-          data['success'] as bool? ?? data['Success'] as bool? ?? false;
+      final success = (data['success'] ?? data['Success'] ?? false) as bool;
       if (!success) {
-        final msg =
-            (data['message'] ?? data['Message'] ?? 'Error en el registro')
-                .toString();
-        throw ValidationException(msg);
+        throw ValidationException(
+          (data['message'] ?? data['Message'] ?? 'Error en el registro')
+              .toString(),
+        );
       }
-      _logger.i('Backend register OK para ${cmd.email}');
 
-      // 4. Login automático usando los datos recién registrados
+      // 4. Login automático tras registro exitoso
       return await login(
           LoginCommand(email: cmd.email, password: cmd.password));
     } on FirebaseAuthException catch (e) {
-      _logger.w('FirebaseAuth register error: ${e.code}');
+      _logger.w('Firebase register error: ${e.code}');
       throw ValidationException(_mapFirebaseError(e.code));
     } on DioException catch (e) {
-      // ROLLBACK: si el backend falló, eliminar el usuario de Firebase
-      // para que no quede un usuario huérfano sin perfil en Firestore
-      if (firebaseUser != null) {
-        _logger.w(
-            'Backend falló — eliminando usuario Firebase ${firebaseUser.uid} para rollback');
-        await firebaseUser.delete().catchError(
-              (err) => _logger.e('Rollback Firebase failed', error: err),
-            );
-      }
       _logger.e(
-        'Backend register error: ${e.type} — ${e.response?.statusCode}',
-        error: e.response?.data,
+        'Backend register error [${e.response?.statusCode}]',
+        error: e.response?.data ?? e.message,
       );
-      throw mapDioError(e);
+      // Rollback: eliminar cuenta Firebase para no dejar usuario huérfano
+      await _rollbackFirebaseUser(firebaseUser);
+      throw handleDioError(e);
+    } on AppException {
+      // Rollback también si el backend retornó {success: false}
+      await _rollbackFirebaseUser(firebaseUser);
+      rethrow;
     }
   }
 
-  /// Mapea la respuesta del backend al modelo AuthAuthenticated
-  /// Soporta camelCase y PascalCase para tolerar cambios del serializador .NET
-  AuthAuthenticated _parseLoginResponse(Map<String, dynamic> d) {
-    String pick(String lower, String upper) =>
-        (d[lower] ?? d[upper] ?? '') as String;
-    String? pickNull(String lower, String upper) =>
-        (d[lower] ?? d[upper]) as String?;
-    bool pickBool(String lower, String upper) =>
-        (d[lower] ?? d[upper] ?? false) as bool;
+  /// Elimina el usuario de Firebase de forma segura (rollback ante error del backend)
+  Future<void> _rollbackFirebaseUser(User? user) async {
+    if (user == null) return;
+    try {
+      await user.delete();
+      _logger.i('Rollback: usuario Firebase eliminado (${user.email})');
+    } catch (e) {
+      _logger.w('Rollback: no se pudo eliminar usuario Firebase', error: e);
+    }
+  }
+
+  /// Mapeo defensivo de la respuesta del backend.
+  /// Tolera tanto camelCase (producción .NET) como PascalCase (cambios futuros).
+  AuthAuthenticated _mapResponse(Map<String, dynamic> d) {
+    String str(String a, String b) => ((d[a] ?? d[b]) ?? '').toString();
+    String? strN(String a, String b) => (d[a] ?? d[b]) as String?;
+    bool flag(String a, String b) => (d[a] ?? d[b] ?? false) as bool;
 
     return AuthAuthenticated(
-      uid: pick('userId', 'UserId'),
-      email: pick('email', 'Email'),
-      displayName: pick('nombre', 'Nombre'),
-      role: pick('rol', 'Rol'),
-      photoUrl: pickNull('fotoUrl', 'FotoUrl'),
-      isFirstLogin: pickBool('isFirstLogin', 'IsFirstLogin'),
-      grupoId: pickNull('grupoId', 'GrupoId'),
-      grupoNombre: pickNull('grupoNombre', 'GrupoNombre'),
-      matricula: pickNull('matricula', 'Matricula'),
-      carreraId: pickNull('carreraId', 'CarreraId'),
-      apellidoPaterno: pickNull('apellidoPaterno', 'ApellidoPaterno'),
-      apellidoMaterno: pickNull('apellidoMaterno', 'ApellidoMaterno'),
-      profesion: pickNull('profesion', 'Profesion'),
-      organizacion: pickNull('organizacion', 'Organizacion'),
-      especialidadDocente:
-          pickNull('especialidadDocente', 'EspecialidadDocente'),
-      createdAt: pickNull('createdAt', 'CreatedAt'),
+      uid: str('userId', 'UserId'),
+      email: str('email', 'Email'),
+      displayName: str('nombre', 'Nombre'),
+      role: str('rol', 'Rol'),
+      photoUrl: strN('fotoUrl', 'FotoUrl'),
+      isFirstLogin: flag('isFirstLogin', 'IsFirstLogin'),
+      grupoId: strN('grupoId', 'GrupoId'),
+      grupoNombre: strN('grupoNombre', 'GrupoNombre'),
+      matricula: strN('matricula', 'Matricula'),
+      carreraId: strN('carreraId', 'CarreraId'),
+      apellidoPaterno: strN('apellidoPaterno', 'ApellidoPaterno'),
+      apellidoMaterno: strN('apellidoMaterno', 'ApellidoMaterno'),
+      profesion: strN('profesion', 'Profesion'),
+      organizacion: strN('organizacion', 'Organizacion'),
+      especialidadDocente: strN('especialidadDocente', 'EspecialidadDocente'),
+      createdAt: strN('createdAt', 'CreatedAt'),
     );
   }
 
   String _mapFirebaseError(String code) => switch (code) {
         'user-not-found' => 'No existe una cuenta con ese correo.',
         'wrong-password' => 'Contraseña incorrecta.',
+        'invalid-credential' => 'Correo o contraseña incorrectos.',
         'invalid-email' => 'Correo inválido.',
         'user-disabled' => 'Cuenta deshabilitada.',
         'too-many-requests' => 'Demasiados intentos. Espera unos minutos.',
         'email-already-in-use' => 'Ya existe una cuenta con ese correo.',
-        'weak-password' => 'La contraseña es muy débil.',
+        'weak-password' => 'La contraseña es muy débil (mínimo 6 caracteres).',
         _ => 'Error de autenticación.',
       };
 }

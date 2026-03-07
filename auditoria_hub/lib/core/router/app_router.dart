@@ -11,6 +11,7 @@ import '../../features/showcase/pages/showcase_page.dart';
 import '../../features/splash/pages/splash_page.dart';
 import '../../features/project_detail/pages/project_detail_page.dart';
 import '../../features/ranking/pages/ranking_page.dart';
+import '../../features/dashboard/pages/dashboard_page.dart';
 import '../../features/profile/pages/profile_page.dart';
 import '../widgets/shell_scaffold.dart';
 
@@ -32,46 +33,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: authNotifier,
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
-      final currentLocation = state.matchedLocation;
+      final loc = state.matchedLocation;
 
-      // Casos de redirección mejorados:
       switch (authState) {
         case AuthLoading():
-          // Durante carga, permitir solo splash
-          if (currentLocation != '/splash') return '/splash';
-          break;
+          return loc == '/splash' ? null : '/splash';
 
         case AuthUnauthenticated():
-          // Sin autenticar: permitir rutas públicas o redirigir a login
-          final isPublic =
-              _publicRoutes.any((r) => currentLocation.startsWith(r));
-          if (!isPublic) return '/login';
-          break;
+          final isPublic = _publicRoutes.any((r) => loc.startsWith(r));
+          return isPublic ? null : '/login';
 
-        case AuthAuthenticated(isFirstLogin: true):
-          // Usuario autenticado pero necesita completar perfil
-          // Por ahora redirigir a showcase, más adelante implementar complete-profile
-          if (currentLocation == '/login' || currentLocation == '/splash') {
+        case AuthAuthenticated(:final isFirstLogin):
+          // Si aún necesita completar datos, ir a /register
+          if (isFirstLogin && loc != '/register') return '/register';
+          // Si ya completó, salir de las pantallas de auth
+          if (!isFirstLogin &&
+              (loc == '/login' || loc == '/splash' || loc == '/register')) {
             return '/showcase';
           }
-          break;
-
-        case AuthAuthenticated():
-          // Usuario autenticado y perfil completo
-          if (currentLocation == '/login' || currentLocation == '/splash') {
-            return '/showcase'; // Dashboard principal
-          }
-          break;
+          return null;
 
         case AuthError():
-          // Error de autenticación → volver al login
-          if (currentLocation != '/login' && currentLocation != '/splash') {
-            return '/login';
-          }
-          break;
+          return (loc == '/login' || loc == '/splash') ? null : '/login';
       }
-
-      return null; // No hay redirección necesaria
     },
     routes: [
       // ── Splash ───────────────────────────────────────────────────────
@@ -111,6 +95,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
+          ),
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const DashboardPage(),
           ),
         ],
       ),

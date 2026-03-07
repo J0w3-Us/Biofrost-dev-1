@@ -23,6 +23,8 @@ class ProjectDetailPage extends ConsumerWidget {
     final state = ref.watch(projectDetailProvider(projectId));
     final auth = ref.watch(authStateProvider);
     final isTeacher = auth is AuthAuthenticated && auth.isTeacher;
+    final isGuest = auth is AuthAuthenticated && auth.isGuest;
+    final currentUserId = auth is AuthAuthenticated ? auth.uid : null;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Toast listeners
@@ -233,13 +235,28 @@ class ProjectDetailPage extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.sp20),
                 ],
 
-                // Evaluation (docentes)
-                if (isTeacher) ...[
+                // Evaluation (docentes e invitados)
+                if (isTeacher || isGuest) ...[
                   _Section(
-                    title: 'Evaluación',
+                    title: isTeacher ? 'Evaluación' : 'Sugerencia',
                     isDark: isDark,
                     child: _EvaluationSection(
                         projectId: project.id, isDark: isDark),
+                  ),
+                  const SizedBox(height: AppSpacing.sp20),
+                ],
+
+                // Lista de todas las evaluaciones
+                if (project.evaluations.isNotEmpty) ...[
+                  _Section(
+                    title: 'Evaluaciones',
+                    isDark: isDark,
+                    child: _EvaluationsList(
+                      evaluations: project.evaluations,
+                      currentUserId: currentUserId,
+                      projectId: project.id,
+                      isDark: isDark,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.sp20),
                 ],
@@ -835,6 +852,193 @@ class _EvaluationSectionState extends ConsumerState<_EvaluationSection> {
                 ? null
                 : () => _showConfirmDialog(state.project!),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Evaluaciones List ──────────────────────────────────────────────────────
+
+class _EvaluationsList extends ConsumerWidget {
+  const _EvaluationsList({
+    required this.evaluations,
+    required this.currentUserId,
+    required this.projectId,
+    required this.isDark,
+  });
+
+  final List<EvaluationReadModel> evaluations;
+  final String? currentUserId;
+  final String projectId;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Mostrar: las públicas + la propia del usuario (aunque sea privada)
+    final visible = evaluations
+        .where((e) => e.esPublico || e.evaluatorId == currentUserId)
+        .toList();
+
+    if (visible.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Aún no hay evaluaciones públicas',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            color:
+                isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: visible
+          .map((e) => _EvalCard(
+                eval: e,
+                isOwn: e.evaluatorId == currentUserId,
+                projectId: projectId,
+                isDark: isDark,
+              ))
+          .toList(),
+    );
+  }
+}
+
+class _EvalCard extends ConsumerWidget {
+  const _EvalCard({
+    required this.eval,
+    required this.isOwn,
+    required this.projectId,
+    required this.isDark,
+  });
+
+  final EvaluationReadModel eval;
+  final bool isOwn;
+  final String projectId;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface0 : AppColors.lightBackground,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eval.evaluatorName,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      eval.tipo == 'oficial' ? 'Docente' : 'Sugerencia',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: eval.tipo == 'oficial'
+                            ? const Color(0xFF2563EB)
+                            : const Color(0xFF9333EA),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Estrellas
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(5, (i) {
+                  return Icon(
+                    i < eval.stars
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 14,
+                    color: Colors.amber,
+                  );
+                }),
+              ),
+              // Visibility toggle (solo para el autor)
+              if (isOwn) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    ref
+                        .read(projectDetailProvider(projectId).notifier)
+                        .toggleVisibility(eval.id, !eval.esPublico);
+                  },
+                  child: Tooltip(
+                    message: eval.esPublico ? 'Hacer privada' : 'Hacer pública',
+                    child: Icon(
+                      eval.esPublico
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      size: 18,
+                      color: eval.esPublico ? AppColors.success : textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          // Feedback
+          if (eval.feedback != null && eval.feedback!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '"${eval.feedback}"',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: textSecondary,
+              ),
+            ),
+          ],
+          // Visibilidad tag (solo para el autor cuando es privada)
+          if (isOwn && !eval.esPublico) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: textSecondary.withAlpha(20),
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+              child: Text(
+                'Privada — solo tú la ves',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  color: textSecondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

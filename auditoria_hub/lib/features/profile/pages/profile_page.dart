@@ -2,12 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../data/profile_remote_datasource.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -48,7 +50,11 @@ class ProfilePage extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: AppSpacing.sp40),
         children: [
           // ── Header ──────────────────────────────────────────────────
-          _ProfileHeader(auth: auth, isDark: isDark),
+          _ProfileHeader(
+            auth: auth,
+            isDark: isDark,
+            onPickPhoto: () => _pickAndUploadPhoto(context, ref, auth),
+          ),
 
           const SizedBox(height: AppSpacing.sp20),
 
@@ -96,7 +102,7 @@ class ProfilePage extends ConsumerWidget {
             icon: Icons.edit_outlined,
             title: 'Editar perfil',
             showArrow: true,
-            onTap: () {}, // TODO: navegar a editar perfil
+            onTap: () => _showEditProfileSheet(context, ref, auth, isDark),
           ),
 
           const SizedBox(height: AppSpacing.sp24),
@@ -174,6 +180,42 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
+  Future<void> _pickAndUploadPhoto(
+      BuildContext context, WidgetRef ref, AuthAuthenticated auth) async {
+    final picker = ImagePicker();
+    final picked =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked == null || !context.mounted) return;
+
+    final ds = ref.read(profileRemoteDatasourceProvider);
+    try {
+      final url = await ds.uploadImage(picked);
+      await ds.updatePhoto(auth.uid, url);
+      ref.read(authStateProvider.notifier).updatePhotoInState(url);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto actualizada')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al subir la foto')),
+        );
+      }
+    }
+  }
+
+  void _showEditProfileSheet(BuildContext context, WidgetRef ref,
+      AuthAuthenticated auth, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditProfileSheet(auth: auth, isDark: isDark, ref: ref),
+    );
+  }
+
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -218,9 +260,14 @@ class ProfilePage extends ConsumerWidget {
 // ── Profile Header ──────────────────────────────────────────────────────────
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.auth, required this.isDark});
+  const _ProfileHeader({
+    required this.auth,
+    required this.isDark,
+    required this.onPickPhoto,
+  });
   final AuthAuthenticated auth;
   final bool isDark;
+  final VoidCallback onPickPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -238,11 +285,43 @@ class _ProfileHeader extends StatelessWidget {
           horizontal: AppSpacing.sp16, vertical: AppSpacing.sp24),
       child: Row(
         children: [
-          UserAvatar(
-            name: auth.displayName,
-            imageUrl: auth.photoUrl,
-            size: 72,
-            showBorder: true,
+          GestureDetector(
+            onTap: onPickPhoto,
+            child: Stack(
+              children: [
+                UserAvatar(
+                  name: auth.displayName,
+                  imageUrl: auth.photoUrl,
+                  size: 72,
+                  showBorder: true,
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.darkPrimary
+                          : AppColors.lightPrimary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.darkSurface0
+                            : AppColors.lightBackground,
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: AppSpacing.sp16),
           Expanded(
@@ -471,6 +550,236 @@ class _InfoRow extends StatelessWidget {
                   : AppColors.lightForeground,
             ),
             overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Edit Profile Bottom Sheet ─────────────────────────────────────────────────
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({
+    required this.auth,
+    required this.isDark,
+    required this.ref,
+  });
+  final AuthAuthenticated auth;
+  final bool isDark;
+  final WidgetRef ref;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _linkedinCtrl;
+  late final TextEditingController _githubCtrl;
+  late final TextEditingController _websiteCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _linkedinCtrl = TextEditingController();
+    _githubCtrl = TextEditingController();
+    _websiteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _linkedinCtrl.dispose();
+    _githubCtrl.dispose();
+    _websiteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final links = <String, String>{};
+    if (_linkedinCtrl.text.trim().isNotEmpty) {
+      links['linkedin'] = _linkedinCtrl.text.trim();
+    }
+    if (_githubCtrl.text.trim().isNotEmpty) {
+      links['github'] = _githubCtrl.text.trim();
+    }
+    if (_websiteCtrl.text.trim().isNotEmpty) {
+      links['website'] = _websiteCtrl.text.trim();
+    }
+
+    setState(() => _saving = true);
+    try {
+      final ds = widget.ref.read(profileRemoteDatasourceProvider);
+      await ds.updateSocial(widget.auth.uid, links);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil actualizado')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al guardar los cambios')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface1 : Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        left: AppSpacing.sp16,
+        right: AppSpacing.sp16,
+        top: AppSpacing.sp16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.sp32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sp16),
+          Text(
+            'Editar perfil',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightForeground,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sp8),
+          Text(
+            'Actualiza tus redes sociales para que aparezcan en tu perfil público.',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color:
+                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sp20),
+          _SocialField(
+            controller: _linkedinCtrl,
+            label: 'LinkedIn',
+            hint: 'https://linkedin.com/in/usuario',
+            icon: Icons.link_rounded,
+            isDark: isDark,
+          ),
+          const SizedBox(height: AppSpacing.sp12),
+          _SocialField(
+            controller: _githubCtrl,
+            label: 'GitHub',
+            hint: 'https://github.com/usuario',
+            icon: Icons.code_rounded,
+            isDark: isDark,
+          ),
+          const SizedBox(height: AppSpacing.sp12),
+          _SocialField(
+            controller: _websiteCtrl,
+            label: 'Sitio web',
+            hint: 'https://mi-sitio.com',
+            icon: Icons.language_rounded,
+            isDark: isDark,
+          ),
+          const SizedBox(height: AppSpacing.sp24),
+          BioButton(
+            label: 'Guardar cambios',
+            onPressed: _saving ? null : _save,
+            isLoading: _saving,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialField extends StatelessWidget {
+  const _SocialField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.isDark,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color:
+                isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightForeground,
+          ),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon,
+                size: 18,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightMutedFg),
+            hintText: hint,
+            hintStyle: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color:
+                  isDark ? AppColors.darkTextDisabled : AppColors.lightMutedFg,
+            ),
+            filled: true,
+            fillColor: isDark ? AppColors.darkSurface2 : AppColors.lightMuted,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sp12, vertical: AppSpacing.sp12),
           ),
         ),
       ],
