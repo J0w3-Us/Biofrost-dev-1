@@ -1,4 +1,7 @@
 // features/auth/pages/login_page.dart — RF-01: Login/Registro estilo Biofrost
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,26 +22,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _orgCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _isLoading = false;
+  bool _showWakeUp = false;
+  bool _showResetLink = false;
+  bool _resetSent = false;
   String? _errorMsg;
-
-  // Invitado = cualquier correo que NO sea de la institución
-  bool get _isGuest =>
-      !_emailCtrl.text.trim().toLowerCase().endsWith('@utmetropolitana.edu.mx');
+  Timer? _wakeUpTimer;
 
   @override
   void initState() {
     super.initState();
-    _emailCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
+    _wakeUpTimer?.cancel();
     _emailCtrl.dispose();
     _passCtrl.dispose();
-    _orgCtrl.dispose();
     super.dispose();
   }
 
@@ -48,6 +49,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     setState(() {
       _isLoading = true;
       _errorMsg = null;
+      _showWakeUp = false;
+      _showResetLink = false;
+      _resetSent = false;
+    });
+    // Mostrar aviso de wake-up si el servidor tarda más de 8 s
+    _wakeUpTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted && _isLoading) setState(() => _showWakeUp = true);
     });
     await ref.read(authStateProvider.notifier).login(
           LoginCommand(
@@ -55,11 +63,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             password: _passCtrl.text,
           ),
         );
+    _wakeUpTimer?.cancel();
     final authState = ref.read(authStateProvider);
     if (!mounted) return;
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = false;
+      _showWakeUp = false;
+    });
     if (authState is AuthAuthenticated) {
-      // Notificación de éxito tipo 10.svg
       showDialog(
         context: context,
         builder: (_) => _SuccessDialog(
@@ -71,16 +82,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       );
     } else if (authState is AuthError) {
       final msg = authState.message;
-      // Diferenciar errores para dar un mensaje claro al usuario
-      if (msg.contains('NetworkException') || msg.contains('network')) {
-        setState(() => _errorMsg =
-            'Sin conexión. Verifica tu internet e intenta de nuevo.');
-      } else if (msg.contains('TimeoutException') || msg.contains('timeout')) {
-        setState(() => _errorMsg =
-            'El servidor tardó en responder (primera conexión del día). Espera unos segundos e intenta de nuevo.');
-      } else {
-        setState(() => _errorMsg = msg);
-      }
+      final isCredError = msg.toLowerCase().contains('contraseña') ||
+          msg.toLowerCase().contains('incorrectos') ||
+          msg.toLowerCase().contains('credential');
+      setState(() {
+        _errorMsg = msg;
+        _showResetLink = isCredError;
+      });
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMsg = 'Ingresa tu correo antes de recuperar la contraseña.');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      setState(() {
+        _resetSent = true;
+        _showResetLink = false;
+        _errorMsg = null;
+      });
+    } catch (_) {
+      setState(() => _errorMsg = 'No se pudo enviar el correo de recuperación. Verifica el correo e intenta de nuevo.');
     }
   }
 
@@ -216,22 +242,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           },
                           onFieldSubmitted: (_) => _submitLogin(),
                         ),
-                        // ── Organización — solo visible para invitados ────
-                        if (_isGuest) ...[
-                          const SizedBox(height: 18),
-                          _FieldLabel('Organización', isDark: isDark),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _orgCtrl,
-                            textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              hintText: 'Nombre de tu organización',
-                              prefixIcon:
-                                  Icon(Icons.business_outlined, size: 18),
-                            ),
-                            onFieldSubmitted: (_) => _submitLogin(),
-                          ),
-                        ],
+
                         if (_errorMsg != null) ...[
                           const SizedBox(height: 16),
                           Container(
@@ -256,22 +267,70 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ],
                             ),
                           ),
+                          if (_showResetLink) ...[  
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: _sendPasswordReset,
+                              child: const Text('¿Olvidaste tu contraseña? Recúpérala aquí'),
+                            ),
+                          ],
                         ],
-                        const SizedBox(height: 28),
-                        // Aviso de cold-start cuando el servidor puede estar dormido
-                        if (_isLoading) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'La primera conexión del día puede tardar hasta 60 s mientras el servidor despierta.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightMutedFg,
+                        if (_resetSent) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withAlpha(20),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(color: Colors.green.withAlpha(80)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.check_circle_outline_rounded,
+                                    size: 16, color: Colors.green),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Correo de recuperación enviado. Revisa tu bandeja.',
+                                    style: TextStyle(fontSize: 13, color: Colors.green),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
+                        if (_showWakeUp) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(20),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border:
+                                  Border.all(color: Colors.orange.withAlpha(80)),
+                            ),
+                            child: const Row(
+                              children: [
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.orange),
+                                ),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Servidor despertando... Esto solo ocurre en la primera conexión del día.',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.orange),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 28),
                         BioButton(
                           label: 'Iniciar sesión',
                           isLoading: _isLoading,

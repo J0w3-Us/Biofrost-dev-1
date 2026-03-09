@@ -24,10 +24,9 @@ final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
       baseUrl: config.baseUrl,
-      // Render free tier tarda 50-90 s en cold-start al primer request del día.
-      // connectTimeout debe ser >= ese tiempo para no fallar antes de recibir respuesta.
-      connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 90),
+      // Timeout corto + reintentos automáticos en datasource para Render cold-start.
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 20),
       headers: {'Content-Type': 'application/json'},
     ),
   );

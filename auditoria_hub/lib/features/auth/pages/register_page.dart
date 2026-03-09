@@ -1,4 +1,6 @@
 // features/auth/pages/register_page.dart — Pantalla de registro (diseño profesional)
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,11 +39,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _orgCtrl = TextEditingController();
-  final _profesionCtrl = TextEditingController();
 
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _showWakeUp = false;
+  Timer? _wakeUpTimer;
   String? _errorMsg;
 
   // ── Step 2 — Asignación docente ─────────────────────────────────────────
@@ -139,6 +142,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   void dispose() {
     _emailCtrl.removeListener(_onEmailChanged);
+    _wakeUpTimer?.cancel();
     _nameCtrl.dispose();
     _apellidoPaternoCtrl.dispose();
     _apellidoMaternoCtrl.dispose();
@@ -146,26 +150,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     _orgCtrl.dispose();
-    _profesionCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submitRegister() async {
-    // ── Step 2: validación manual de la cascada ─────────────────────────────
+    // ── Step 2: sin validación obligatoria — datos pueden ser nulos ──────────
     if (_isTeacher && _registerStep == 2) {
       setState(() => _errorMsg = null);
-      if (_selectedCarreraId == null) {
-        setState(() => _errorMsg = 'Selecciona tu carrera');
-        return;
-      }
-      if (_selectedMateriaId == null) {
-        setState(() => _errorMsg = 'Selecciona la materia que impartes');
-        return;
-      }
-      if (_selectedGruposIds.isEmpty) {
-        setState(() => _errorMsg = 'Selecciona al menos un grupo');
-        return;
-      }
     } else {
       // ── Step 1: validación del formulario ────────────────────────────────
       if (!_formKey.currentState!.validate()) return;
@@ -186,6 +177,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     setState(() {
       _isLoading = true;
       _errorMsg = null;
+      _showWakeUp = false;
+    });
+    // Mostrar aviso de wake-up si el servidor tarda más de 8 s
+    _wakeUpTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted && _isLoading) setState(() => _showWakeUp = true);
     });
 
     try {
@@ -200,22 +196,26 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
         rol: _detectedRole,
-        profesion: _isTeacher && _profesionCtrl.text.trim().isNotEmpty
-            ? _profesionCtrl.text.trim()
-            : null,
+        profesion: null,
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
             : null,
         carrerasIds: _isTeacher && _selectedCarreraId != null
             ? [_selectedCarreraId!]
             : const [],
-        gruposDocente: _isTeacher ? _selectedGruposIds : const [],
+        gruposDocente: _isTeacher && _selectedGruposIds.isNotEmpty
+            ? _selectedGruposIds
+            : const [],
       );
 
       await ref.read(authStateProvider.notifier).register(cmd);
 
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      _wakeUpTimer?.cancel();
+      setState(() {
+        _isLoading = false;
+        _showWakeUp = false;
+      });
 
       // Verificar si el registro fue exitoso
       final authState = ref.read(authStateProvider);
@@ -236,8 +236,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
     } catch (e) {
       if (!mounted) return;
+      _wakeUpTimer?.cancel();
       setState(() {
         _isLoading = false;
+        _showWakeUp = false;
         _errorMsg = e.toString().replaceAll('Exception: ', '');
       });
     }
@@ -332,412 +334,435 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
 
               // ── Formulario — sin bordes, full-width ─────────────────────
-              Container(
-                color: isDark ? AppColors.darkSurface1 : Colors.white,
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // ── STEP 1: Datos personales ─────────────────────────────────
-                      if (_registerStep == 1) ...[
-                        // ── Nombre ──────────────────────────────────────────
-                        _FieldLabel('Nombre *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _nameCtrl,
-                          textInputAction: TextInputAction.next,
-                          textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            hintText: 'Tu nombre',
-                            prefixIcon:
-                                Icon(Icons.person_outline_rounded, size: 18),
-                          ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Ingresa tu nombre'
-                              : null,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Apellidos — dos columnas ─────────────────────────
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _FieldLabel('Ap. Paterno', isDark: isDark),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    controller: _apellidoPaternoCtrl,
-                                    textInputAction: TextInputAction.next,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Paterno',
-                                      prefixIcon: Icon(Icons.person_2_outlined,
-                                          size: 16),
-                                      contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _FieldLabel('Ap. Materno', isDark: isDark),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    controller: _apellidoMaternoCtrl,
-                                    textInputAction: TextInputAction.next,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Materno',
-                                      prefixIcon: Icon(Icons.person_3_outlined,
-                                          size: 16),
-                                      contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Correo ──────────────────────────────────────────
-                        _FieldLabel('Correo electrónico *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            hintText: 'correo@institucion.edu',
-                            prefixIcon: Icon(Icons.email_outlined, size: 18),
-                          ),
-                          validator: (v) {
-                            if (v == null || v.isEmpty)
-                              return 'Ingresa tu correo';
-                            if (!v.contains('@')) return 'Correo inválido';
-                            return null;
-                          },
-                        ),
-
-                        // ── Role badge — aparece al detectar rol ─────────────
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeInOut,
-                          child: _emailCtrl.text.isNotEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 10),
-                                  child: _RoleBadge(
-                                    role: _detectedRole,
-                                    isDark: isDark,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-
-                        // ── Profesión — solo Docentes ────────────────────────
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeInOut,
-                          child: _emailCtrl.text.isNotEmpty && _isTeacher
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _FieldLabel('Profesión', isDark: isDark),
-                                      const SizedBox(height: 6),
-                                      TextFormField(
-                                        controller: _profesionCtrl,
-                                        textInputAction: TextInputAction.next,
-                                        textCapitalization:
-                                            TextCapitalization.words,
-                                        decoration: const InputDecoration(
-                                          hintText: 'Ej: Ingeniero en Sistemas',
-                                          prefixIcon: Icon(
-                                              Icons.work_outline_rounded,
-                                              size: 18),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Contraseña ───────────────────────────────────────
-                        _FieldLabel('Contraseña *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _passCtrl,
-                          obscureText: _obscurePass,
-                          textInputAction: TextInputAction.next,
-                          decoration: InputDecoration(
-                            hintText: 'Mínimo 6 caracteres',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                size: 18),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePass
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                size: 18,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _obscurePass = !_obscurePass),
-                            ),
-                          ),
-                          validator: (v) {
-                            if (v == null || v.isEmpty)
-                              return 'Ingresa una contraseña';
-                            if (v.length < 6) return 'Mínimo 6 caracteres';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Confirmar contraseña ─────────────────────────────
-                        _FieldLabel('Confirmar contraseña *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _confirmCtrl,
-                          obscureText: _obscureConfirm,
-                          textInputAction: TextInputAction.done,
-                          decoration: InputDecoration(
-                            hintText: 'Repite tu contraseña',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                size: 18),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirm
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                size: 18,
-                              ),
-                              onPressed: () => setState(
-                                  () => _obscureConfirm = !_obscureConfirm),
-                            ),
-                          ),
-                          validator: (v) {
-                            if (v != _passCtrl.text)
-                              return 'Las contraseñas no coinciden';
-                            return null;
-                          },
-                          onFieldSubmitted: (_) => _submitRegister(),
-                        ),
-
-                        // ── Organización — solo invitados ─────────────────────
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeInOut,
-                          child: _emailCtrl.text.isNotEmpty && _isGuest
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _FieldLabel('Organización',
-                                          isDark: isDark),
-                                      const SizedBox(height: 6),
-                                      TextFormField(
-                                        controller: _orgCtrl,
-                                        textInputAction: TextInputAction.done,
-                                        decoration: const InputDecoration(
-                                          hintText:
-                                              'Institución u organización (opcional)',
-                                          prefixIcon: Icon(
-                                              Icons.business_outlined,
-                                              size: 18),
-                                        ),
-                                        onFieldSubmitted: (_) =>
-                                            _submitRegister(),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ], // end step 1
-
-                      // ── STEP 2: Asignación docente ─────────────────────────────────
-                      if (_isTeacher && _registerStep == 2) ...[
-                        // ── Carrera ───────────────────────────────────────
-                        _FieldLabel('Carrera *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        if (_loadingCatalogs && _carreras.isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        else
-                          DropdownButtonFormField<String>(
-                            value: _selectedCarreraId,
-                            hint: const Text('Selecciona tu carrera'),
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.school_rounded, size: 18),
-                            ),
-                            items: _carreras
-                                .map((c) => DropdownMenuItem<String>(
-                                      value: c['id'] as String?,
-                                      child: Text(c['nombre'] as String? ?? ''),
-                                    ))
-                                .toList(),
-                            onChanged: _onCarreraChanged,
-                          ),
-                        const SizedBox(height: 12),
-
-                        // ── Materia ───────────────────────────────────────
-                        _FieldLabel('Materia *', isDark: isDark),
-                        const SizedBox(height: 6),
-                        if (_loadingCatalogs && _selectedCarreraId != null)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        else
-                          DropdownButtonFormField<String>(
-                            value: _selectedMateriaId,
-                            hint: Text(
-                              _selectedCarreraId == null
-                                  ? 'Elige una carrera primero'
-                                  : 'Selecciona la materia que impartes',
-                            ),
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.book_outlined, size: 18),
-                            ),
-                            items: _availableMaterias.map((entry) {
-                              final m =
-                                  entry['materia'] as Map<String, dynamic>? ??
-                                      {};
-                              return DropdownMenuItem<String>(
-                                value: m['id'] as String?,
-                                child: Text(
-                                  '${m['nombre'] ?? ''} '
-                                  '(${m['cuatrimestre'] ?? ''}°)',
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: _selectedCarreraId == null
-                                ? null
-                                : (val) => setState(() {
-                                      _selectedMateriaId = val;
-                                      _selectedGruposIds = [];
-                                    }),
-                          ),
-                        const SizedBox(height: 12),
-
-                        // ── Grupos ─────────────────────────────────────────
-                        if (_selectedMateriaId != null &&
-                            _gruposDeMateria.isNotEmpty) ...[
-                          _FieldLabel('Grupos *', isDark: isDark),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: screenH - (screenH * 0.28),
+                ),
+                child: Container(
+                  color: isDark ? AppColors.darkSurface1 : Colors.white,
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ── STEP 1: Datos personales ─────────────────────────────────
+                        if (_registerStep == 1) ...[
+                          // ── Nombre ──────────────────────────────────────────
+                          _FieldLabel('Nombre *', isDark: isDark),
                           const SizedBox(height: 6),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.darkSurface0
-                                  : AppColors.lightBackground,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              border: Border.all(
-                                color: isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder,
-                              ),
+                          TextFormField(
+                            controller: _nameCtrl,
+                            textInputAction: TextInputAction.next,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              hintText: 'Tu nombre',
+                              prefixIcon:
+                                  Icon(Icons.person_outline_rounded, size: 18),
                             ),
-                            child: Column(
-                              children: _gruposDeMateria.map((g) {
-                                final gId = g['id'] as String? ?? '';
-                                final turno = g['turno'] as String? ?? '';
-                                return CheckboxListTile(
-                                  value: _selectedGruposIds.contains(gId),
-                                  title: Text(
-                                    '${g["nombre"] ?? ""}'
-                                    '${turno.isNotEmpty ? "  ·  $turno" : ""}',
-                                    style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  dense: true,
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                  onChanged: (checked) => setState(() {
-                                    if (checked == true) {
-                                      if (!_selectedGruposIds.contains(gId)) {
-                                        _selectedGruposIds.add(gId);
-                                      }
-                                    } else {
-                                      _selectedGruposIds.remove(gId);
-                                    }
-                                  }),
-                                );
-                              }).toList(),
-                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Ingresa tu nombre'
+                                : null,
                           ),
                           const SizedBox(height: 12),
-                        ],
-                      ], // end step 2
 
-                      // ── Error ────────────────────────────────────────
-                      if (_errorMsg != null) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withAlpha(20),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            border: Border.all(
-                                color: AppColors.error.withAlpha(80)),
-                          ),
-                          child: Row(
+                          // ── Apellidos — dos columnas ─────────────────────────
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.error_outline_rounded,
-                                  size: 16, color: AppColors.error),
-                              const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  _errorMsg!,
-                                  style: const TextStyle(
-                                      fontSize: 13, color: AppColors.error),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _FieldLabel('Ap. Paterno', isDark: isDark),
+                                    const SizedBox(height: 6),
+                                    TextFormField(
+                                      controller: _apellidoPaternoCtrl,
+                                      textInputAction: TextInputAction.next,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Paterno',
+                                        prefixIcon: Icon(
+                                            Icons.person_2_outlined,
+                                            size: 16),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 14),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _FieldLabel('Ap. Materno', isDark: isDark),
+                                    const SizedBox(height: 6),
+                                    TextFormField(
+                                      controller: _apellidoMaternoCtrl,
+                                      textInputAction: TextInputAction.next,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Materno',
+                                        prefixIcon: Icon(
+                                            Icons.person_3_outlined,
+                                            size: 16),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 14),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
 
-                      const SizedBox(height: 24),
-                      BioButton(
-                        label: _isTeacher && _registerStep == 1
-                            ? 'Continuar →'
-                            : 'Crear cuenta',
-                        isLoading: _isLoading || _loadingCatalogs,
-                        onPressed: _submitRegister,
-                      ),
-                      const SizedBox(height: 14),
-                      TextButton(
-                        onPressed: () => context.go('/login'),
-                        child: const Text('¿Ya tienes cuenta? Inicia sesión'),
-                      ),
-                    ],
+                          // ── Correo ──────────────────────────────────────────
+                          _FieldLabel('Correo electrónico *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              hintText: 'correo@institucion.edu',
+                              prefixIcon: Icon(Icons.email_outlined, size: 18),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty)
+                                return 'Ingresa tu correo';
+                              if (!v.contains('@')) return 'Correo inválido';
+                              return null;
+                            },
+                          ),
+
+                          // ── Role badge — aparece al detectar rol ─────────────
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeInOut,
+                            child: _emailCtrl.text.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: _RoleBadge(
+                                      role: _detectedRole,
+                                      isDark: isDark,
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+
+                          // ── Contraseña ───────────────────────────────────────
+                          _FieldLabel('Contraseña *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _passCtrl,
+                            obscureText: _obscurePass,
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              hintText: 'Mínimo 6 caracteres',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded,
+                                  size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePass
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  size: 18,
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscurePass = !_obscurePass),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty)
+                                return 'Ingresa una contraseña';
+                              if (v.length < 6) return 'Mínimo 6 caracteres';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+
+                          // ── Confirmar contraseña ─────────────────────────────
+                          _FieldLabel('Confirmar contraseña *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _confirmCtrl,
+                            obscureText: _obscureConfirm,
+                            textInputAction: TextInputAction.done,
+                            decoration: InputDecoration(
+                              hintText: 'Repite tu contraseña',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded,
+                                  size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirm
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  size: 18,
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v != _passCtrl.text)
+                                return 'Las contraseñas no coinciden';
+                              return null;
+                            },
+                            onFieldSubmitted: (_) => _submitRegister(),
+                          ),
+
+                          // ── Organización — solo invitados ─────────────────────
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            child: _emailCtrl.text.isNotEmpty && _isGuest
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _FieldLabel('Organización',
+                                            isDark: isDark),
+                                        const SizedBox(height: 6),
+                                        TextFormField(
+                                          controller: _orgCtrl,
+                                          textInputAction: TextInputAction.done,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Institución u organización (opcional)',
+                                            prefixIcon: Icon(
+                                                Icons.business_outlined,
+                                                size: 18),
+                                          ),
+                                          onFieldSubmitted: (_) =>
+                                              _submitRegister(),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ], // end step 1
+
+                        // ── STEP 2: Asignación docente ─────────────────────────────────
+                        if (_isTeacher && _registerStep == 2) ...[
+                          // ── Carrera ───────────────────────────────────────
+                          _FieldLabel('Carrera *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          if (_loadingCatalogs && _carreras.isEmpty)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<String>(
+                              value: _selectedCarreraId,
+                              hint: Text(
+                                _carreras.isEmpty
+                                    ? 'No hay datos disponibles'
+                                    : 'Selecciona tu carrera',
+                              ),
+                              decoration: const InputDecoration(
+                                prefixIcon:
+                                    Icon(Icons.school_rounded, size: 18),
+                              ),
+                              items: _carreras
+                                  .map((c) => DropdownMenuItem<String>(
+                                        value: c['id'] as String?,
+                                        child:
+                                            Text(c['nombre'] as String? ?? ''),
+                                      ))
+                                  .toList(),
+                              onChanged:
+                                  _carreras.isEmpty ? null : _onCarreraChanged,
+                            ),
+                          const SizedBox(height: 12),
+
+                          // ── Materia ───────────────────────────────────────
+                          _FieldLabel('Materia *', isDark: isDark),
+                          const SizedBox(height: 6),
+                          if (_loadingCatalogs && _selectedCarreraId != null)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<String>(
+                              value: _selectedMateriaId,
+                              hint: Text(
+                                _selectedCarreraId == null
+                                    ? 'Elige una carrera primero'
+                                    : _availableMaterias.isEmpty
+                                        ? 'No hay datos disponibles'
+                                        : 'Selecciona la materia que impartes',
+                              ),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.book_outlined, size: 18),
+                              ),
+                              items: _availableMaterias.map((entry) {
+                                final m =
+                                    entry['materia'] as Map<String, dynamic>? ??
+                                        {};
+                                return DropdownMenuItem<String>(
+                                  value: m['id'] as String?,
+                                  child: Text(
+                                    '${m['nombre'] ?? ''} '
+                                    '(${m['cuatrimestre'] ?? ''}°)',
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: _selectedCarreraId == null ||
+                                      _availableMaterias.isEmpty
+                                  ? null
+                                  : (val) => setState(() {
+                                        _selectedMateriaId = val;
+                                        _selectedGruposIds = [];
+                                      }),
+                            ),
+                          const SizedBox(height: 12),
+
+                          // ── Grupos ─────────────────────────────────────────
+                          if (_selectedMateriaId != null &&
+                              _gruposDeMateria.isNotEmpty) ...[
+                            _FieldLabel('Grupos *', isDark: isDark),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.darkSurface0
+                                    : AppColors.lightBackground,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppColors.darkBorder
+                                      : AppColors.lightBorder,
+                                ),
+                              ),
+                              child: Column(
+                                children: _gruposDeMateria.map((g) {
+                                  final gId = g['id'] as String? ?? '';
+                                  final turno = g['turno'] as String? ?? '';
+                                  return CheckboxListTile(
+                                    value: _selectedGruposIds.contains(gId),
+                                    title: Text(
+                                      '${g["nombre"] ?? ""}'
+                                      '${turno.isNotEmpty ? "  ·  $turno" : ""}',
+                                      style: const TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    onChanged: (checked) => setState(() {
+                                      if (checked == true) {
+                                        if (!_selectedGruposIds.contains(gId)) {
+                                          _selectedGruposIds.add(gId);
+                                        }
+                                      } else {
+                                        _selectedGruposIds.remove(gId);
+                                      }
+                                    }),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ], // end step 2
+
+                        // ── Error ────────────────────────────────────────
+                        if (_errorMsg != null) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withAlpha(20),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(
+                                  color: AppColors.error.withAlpha(80)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded,
+                                    size: 16, color: AppColors.error),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMsg!,
+                                    style: const TextStyle(
+                                        fontSize: 13, color: AppColors.error),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        if (_showWakeUp) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(20),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(
+                                  color: Colors.orange.withAlpha(80)),
+                            ),
+                            child: const Row(
+                              children: [
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.orange),
+                                ),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Servidor despertando... Esto solo ocurre en la primera conexión del día.',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.orange),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        BioButton(
+                          label: _isTeacher && _registerStep == 1
+                              ? 'Continuar →'
+                              : 'Crear cuenta',
+                          isLoading: _isLoading || _loadingCatalogs,
+                          onPressed: _submitRegister,
+                        ),
+                        if (_registerStep == 1) ...[
+                          const SizedBox(height: 14),
+                          TextButton(
+                            onPressed: () => context.go('/login'),
+                            child:
+                                const Text('¿Ya tienes cuenta? Inicia sesión'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ),

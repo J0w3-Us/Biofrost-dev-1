@@ -1,7 +1,10 @@
 // features/auth/data/datasources/auth_remote_datasource.dart
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/api_endpoints.dart';
 import '../../../../core/errors/app_exception.dart';
@@ -27,16 +30,16 @@ class AuthRemoteDatasource {
       );
       final user = cred.user!;
 
-      // 2. Llamar al backend con datos de Firebase
-      final res = await _dio.post(
-        ApiEndpoints.login,
-        data: {
-          'firebaseUid': user.uid,
-          'email': user.email,
-          'displayName': user.displayName ?? cmd.email.split('@')[0],
-          'photoUrl': user.photoURL,
-        },
-      );
+      // 2. Llamar al backend con reintentos (tolera Render cold-start ~15-45 s)
+      final res = await _withRetry(() => _dio.post(
+            ApiEndpoints.login,
+            data: {
+              'firebaseUid': user.uid,
+              'email': user.email,
+              'displayName': user.displayName ?? cmd.email.split('@')[0],
+              'photoUrl': user.photoURL,
+            },
+          ));
 
       return _mapResponse(res.data as Map<String, dynamic>);
     } on FirebaseAuthException catch (e) {
@@ -56,24 +59,27 @@ class AuthRemoteDatasource {
     await _firebaseAuth.signOut();
   }
 
-  /// Verifica si hay sesión activa al iniciar la app
+  /// Verifica si hay sesión activa al iniciar la app.
+  /// También limpia usuarios Firebase huérfanos pendientes.
   Future<AuthAuthenticated?> getActiveSession() async {
+    // Limpiar huérfanos de intentos de registro anteriores fallidos
+    await _cleanPendingRollbacks();
     try {
       final user = _firebaseAuth.currentUser;
       if (user == null) return null;
 
       _logger.i('Verificando sesión activa para ${user.email}');
 
-      final res = await _dio.post(
-        ApiEndpoints.login,
-        data: {
-          'firebaseUid': user.uid,
-          'email': user.email,
-          'displayName':
-              user.displayName ?? user.email?.split('@')[0] ?? 'Usuario',
-          'photoUrl': user.photoURL,
-        },
-      );
+      final res = await _withRetry(() => _dio.post(
+            ApiEndpoints.login,
+            data: {
+              'firebaseUid': user.uid,
+              'email': user.email,
+              'displayName':
+                  user.displayName ?? user.email?.split('@')[0] ?? 'Usuario',
+              'photoUrl': user.photoURL,
+            },
+          ));
 
       return _mapResponse(res.data as Map<String, dynamic>);
     } on FirebaseAuthException catch (e) {
@@ -94,7 +100,8 @@ class AuthRemoteDatasource {
 
   /// RF-02: Registro de nuevo usuario - Firebase + API
   /// Si el backend falla, hace rollback eliminando el usuario de Firebase.
-  Future<AuthAuthenticated> register(RegisterCommand cmd) async {
+  Future<AuthAuthenticated> register(RegisterCommand cmd,
+      {bool isRetry = false}) async {
     User? firebaseUser;
     try {
       // 1. Crear cuenta en Firebase
@@ -104,22 +111,22 @@ class AuthRemoteDatasource {
       );
       firebaseUser = cred.user!;
 
-      // 2. Registrar en la API backend
-      final res = await _dio.post(
-        ApiEndpoints.register,
-        data: {
-          'firebaseUid': firebaseUser.uid,
-          'email': cmd.email,
-          'nombre': cmd.nombre,
-          'apellidoPaterno': cmd.apellidoPaterno,
-          'apellidoMaterno': cmd.apellidoMaterno,
-          'rol': cmd.rol,
-          'profesion': cmd.profesion,
-          'organizacion': cmd.organizacion,
-          'gruposDocente': cmd.gruposDocente,
-          'carrerasIds': cmd.carrerasIds,
-        },
-      );
+      // 2. Registrar en la API backend con reintentos
+      final res = await _withRetry(() => _dio.post(
+            ApiEndpoints.register,
+            data: {
+              'firebaseUid': firebaseUser!.uid,
+              'email': cmd.email,
+              'nombre': cmd.nombre,
+              'apellidoPaterno': cmd.apellidoPaterno,
+              'apellidoMaterno': cmd.apellidoMaterno,
+              'rol': cmd.rol,
+              'profesion': cmd.profesion,
+              'organizacion': cmd.organizacion,
+              'gruposDocente': cmd.gruposDocente,
+              'carrerasIds': cmd.carrerasIds,
+            },
+          ));
 
       // 3. Verificar respuesta del backend (tolera PascalCase y camelCase)
       final data = res.data as Map<String, dynamic>;
@@ -136,6 +143,26 @@ class AuthRemoteDatasource {
           LoginCommand(email: cmd.email, password: cmd.password));
     } on FirebaseAuthException catch (e) {
       _logger.w('Firebase register error: ${e.code}');
+      // Cuenta ya existe en Firebase — puede ser un huérfano de intento previo
+      if (e.code == 'email-already-in-use' && !isRetry) {
+        try {
+          // Intentamos login con las mismas credenciales
+          final signIn = await _firebaseAuth.signInWithEmailAndPassword(
+            email: cmd.email,
+            password: cmd.password,
+          );
+          // Éxito → usuario huérfano confirmado → eliminarlo y reintentar
+          _logger.i('Huérfano Firebase detectado (${cmd.email}), limpiando...');
+          await _rollbackFirebaseUser(signIn.user);
+          return await register(cmd, isRetry: true);
+        } on FirebaseAuthException {
+          // Contraseña diferente → conflicto real, no huérfano
+        }
+        throw const ValidationException(
+          'Ya existe una cuenta con ese correo. '
+          'Si olvidaste tu contraseña, recúpérala desde Iniciar sesión.',
+        );
+      }
       throw ValidationException(_mapFirebaseError(e.code));
     } on DioException catch (e) {
       _logger.e(
@@ -158,9 +185,74 @@ class AuthRemoteDatasource {
     try {
       await user.delete();
       _logger.i('Rollback: usuario Firebase eliminado (${user.email})');
+      await _removePendingRollback(user.uid);
     } catch (e) {
-      _logger.w('Rollback: no se pudo eliminar usuario Firebase', error: e);
+      _logger.w('Rollback: no se pudo eliminar usuario Firebase, guardando para después', error: e);
+      await _savePendingRollback(user.uid);
     }
+  }
+
+  // Clave para persistir UIDs de Firebase pendientes de eliminación
+  static const _kPendingRollbackKey = 'pending_firebase_rollback_uids';
+
+  Future<void> _savePendingRollback(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final uids = prefs.getStringList(_kPendingRollbackKey) ?? [];
+      if (!uids.contains(uid)) {
+        uids.add(uid);
+        await prefs.setStringList(_kPendingRollbackKey, uids);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _removePendingRollback(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final uids = prefs.getStringList(_kPendingRollbackKey) ?? [];
+      uids.remove(uid);
+      await prefs.setStringList(_kPendingRollbackKey, uids);
+    } catch (_) {}
+  }
+
+  /// Limpia usuarios Firebase huérfanos guardados en intentos previos.
+  /// Solo puede eliminar al usuario actualmente autenticado.
+  Future<void> _cleanPendingRollbacks() async {
+    try {
+      final current = _firebaseAuth.currentUser;
+      if (current == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final uids = prefs.getStringList(_kPendingRollbackKey) ?? [];
+      if (uids.contains(current.uid)) {
+        _logger.i('Limpiando huérfano pendiente: ${current.uid}');
+        await _rollbackFirebaseUser(current);
+      }
+    } catch (_) {}
+  }
+
+  /// Reintenta operaciones Dio hasta 3 veces con 5 s de espera entre intentos.
+  /// Maneja el cold-start de Render (servidor dormido ~15-45 s).
+  Future<T> _withRetry<T>(
+    Future<T> Function() fn, {
+    int maxAttempts = 3,
+    Duration delay = const Duration(seconds: 5),
+  }) async {
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } on DioException catch (e) {
+        final isRetryable = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.receiveTimeout;
+        if (isRetryable && attempt < maxAttempts) {
+          _logger.i('Reintento $attempt/$maxAttempts tras ${e.type} — esperando ${delay.inSeconds}s...');
+          await Future<void>.delayed(delay);
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw const NetworkException();
   }
 
   /// Mapeo defensivo de la respuesta del backend.
