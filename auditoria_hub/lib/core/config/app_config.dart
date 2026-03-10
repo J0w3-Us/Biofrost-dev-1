@@ -13,7 +13,7 @@ class AppConfig {
     return switch (env) {
       AppEnvironment.development => const AppConfig._(
           environment: AppEnvironment.development,
-          baseUrl: 'http://10.0.2.2:5093',
+          baseUrl: 'https://integradorhub.onrender.com',
           appTitle: 'Biofrost [DEV]',
         ),
       AppEnvironment.staging => const AppConfig._(

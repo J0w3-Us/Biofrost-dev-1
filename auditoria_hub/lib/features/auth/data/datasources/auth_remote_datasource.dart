@@ -20,36 +20,87 @@ class AuthRemoteDatasource {
   final Dio _dio;
   final _firebaseAuth = FirebaseAuth.instance;
 
-  /// RF-01: Login — Firebase Auth + llamada directa al backend (sin JWT)
+  /// RF-01: Login — Solo intenta sign-in. Si la cuenta no existe o la contraseña
+  /// es incorrecta lanza un error descriptivo. NO auto-crea cuentas.
   Future<AuthAuthenticated> login(LoginCommand cmd) async {
     try {
-      // 1. Firebase Auth
-      final cred = await _firebaseAuth.signInWithEmailAndPassword(
-        email: cmd.email,
-        password: cmd.password,
-      );
-      final user = cred.user!;
+      User firebaseUser;
 
-      // 2. Llamar al backend con reintentos (tolera Render cold-start ~15-45 s)
+      if (cmd.isGoogleSignIn) {
+        // Google ya autenticó antes del llamado; usamos el usuario activo.
+        final current = _firebaseAuth.currentUser;
+        if (current == null) throw const ValidationException('No se pudo iniciar sesión con Google.');
+        firebaseUser = current;
+      } else {
+        // Email + password: SOLO intenta sign-in.
+        try {
+          final cred = await _firebaseAuth.signInWithEmailAndPassword(
+            email: cmd.email,
+            password: cmd.password,
+          );
+          firebaseUser = cred.user!;
+        } on FirebaseAuthException catch (e) {
+          _logger.w('Firebase login error: ${e.code}');
+          throw ValidationException(_mapFirebaseError(e.code));
+        }
+      }
+
+      // Llamar al backend
       final res = await _withRetry(() => _dio.post(
             ApiEndpoints.login,
             data: {
-              'firebaseUid': user.uid,
-              'email': user.email,
-              'displayName': user.displayName ?? cmd.email.split('@')[0],
-              'photoUrl': user.photoURL,
+              'firebaseUid': firebaseUser.uid,
+              'email': firebaseUser.email,
+              'displayName': firebaseUser.displayName ?? cmd.email.split('@')[0],
+              'photoUrl': firebaseUser.photoURL,
             },
           ));
 
       return _mapResponse(res.data as Map<String, dynamic>);
-    } on FirebaseAuthException catch (e) {
-      _logger.w('Firebase login error: ${e.code} — ${e.message}');
-      throw ValidationException(_mapFirebaseError(e.code));
     } on DioException catch (e) {
       _logger.e(
         'Backend login error [${e.response?.statusCode}]',
         error: e.response?.data ?? e.message,
       );
+      throw handleDioError(e);
+    }
+  }
+
+  /// RF-01b: Crear cuenta nueva en Firebase y notificar al backend.
+  /// El backend detectará que el usuario es nuevo (isFirstLogin=true) al llamar /login.
+  Future<AuthAuthenticated> createAccount(LoginCommand cmd) async {
+    User? firebaseUser;
+    try {
+      // 1. Crear cuenta en Firebase Auth
+      final cred = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: cmd.email,
+        password: cmd.password,
+      );
+      firebaseUser = cred.user!;
+
+      // 2. Llamar al backend igual que en login — el backend creará el doc en Firestore
+      //    y retornará isFirstLogin=true porque el usuario no tenía datos de perfil.
+      final res = await _withRetry(() => _dio.post(
+            ApiEndpoints.login,
+            data: {
+              'firebaseUid': firebaseUser!.uid,
+              'email': firebaseUser.email,
+              'displayName': firebaseUser.displayName ?? cmd.email.split('@')[0],
+              'photoUrl': firebaseUser.photoURL,
+            },
+          ));
+
+      return _mapResponse(res.data as Map<String, dynamic>);
+    } on FirebaseAuthException catch (e) {
+      _logger.w('Firebase createUser error: ${e.code}');
+      throw ValidationException(_mapFirebaseError(e.code));
+    } on DioException catch (e) {
+      _logger.e(
+        'Backend createAccount/login error [${e.response?.statusCode}]',
+        error: e.response?.data ?? e.message,
+      );
+      // Rollback: si el backend falló después de crear en Firebase, limpiamos
+      await _rollbackFirebaseUser(firebaseUser);
       throw handleDioError(e);
     }
   }
@@ -123,8 +174,14 @@ class AuthRemoteDatasource {
               'rol': cmd.rol,
               'profesion': cmd.profesion,
               'organizacion': cmd.organizacion,
-              'gruposDocente': cmd.gruposDocente,
-              'carrerasIds': cmd.carrerasIds,
+              // ── Estructura exacta del backend C# ─────────────────────────
+              'asignaciones': cmd.asignaciones.isEmpty
+                  ? null
+                  : cmd.asignaciones.map((a) => a.toJson()).toList(),
+              // Campos requeridos por el schema del backend (nullables)
+              'grupoId': null,
+              'matricula': null,
+              'carreraId': null,
             },
           ));
 
@@ -141,6 +198,7 @@ class AuthRemoteDatasource {
       // 4. Login automático tras registro exitoso
       return await login(
           LoginCommand(email: cmd.email, password: cmd.password));
+
     } on FirebaseAuthException catch (e) {
       _logger.w('Firebase register error: ${e.code}');
       // Cuenta ya existe en Firebase — puede ser un huérfano de intento previo
@@ -176,6 +234,63 @@ class AuthRemoteDatasource {
       // Rollback también si el backend retornó {success: false}
       await _rollbackFirebaseUser(firebaseUser);
       rethrow;
+    }
+  }
+
+  /// RF-03: Completar Perfil - Post-Login (API)
+  /// Se ejecuta cuando un usuario acaba de iniciar sesión por primera vez y necesita completar datos
+  Future<AuthAuthenticated> completeProfile(CompleteProfileCommand cmd) async {
+    try {
+      // 1. Enviar datos al backend (el usuario Firebase ya existe)
+      final res = await _withRetry(() => _dio.post(
+            ApiEndpoints.register,
+            data: {
+              'firebaseUid': cmd.firebaseUid,
+              'email': cmd.email,
+              'nombre': cmd.nombre,
+              'apellidoPaterno': cmd.apellidoPaterno,
+              'apellidoMaterno': cmd.apellidoMaterno,
+              'rol': cmd.rol,
+              'profesion': cmd.profesion,
+              'organizacion': cmd.organizacion,
+              'asignaciones': cmd.asignaciones.isEmpty
+                  ? null
+                  : cmd.asignaciones.map((a) => a.toJson()).toList(),
+              // Valores por defecto nullables que maneja el backend
+              'grupoId': null,
+              'matricula': null,
+              'carreraId': null,
+            },
+          ));
+
+      // 2. Verificar respuesta del backend
+      final data = res.data as Map<String, dynamic>;
+      final success = (data['success'] ?? data['Success'] ?? false) as bool;
+      if (!success) {
+        throw ValidationException(
+          (data['message'] ?? data['Message'] ?? 'Error al completar el perfil')
+              .toString(),
+        );
+      }
+
+      // 3. Obtener los datos actualizados mediante un login simulado a la API para refrescar estado
+      final loginRes = await _withRetry(() => _dio.post(
+            ApiEndpoints.login,
+            data: {
+              'firebaseUid': cmd.firebaseUid,
+              'email': cmd.email,
+              'displayName': cmd.nombre,
+            },
+          ));
+
+      return _mapResponse(loginRes.data as Map<String, dynamic>);
+
+    } on DioException catch (e) {
+      _logger.e(
+        'Backend completeProfile error [${e.response?.statusCode}]',
+        error: e.response?.data ?? e.message,
+      );
+      throw handleDioError(e);
     }
   }
 

@@ -19,7 +19,7 @@ class ShowcaseRemoteDatasource {
   }) async {
     try {
       final res = await _dio.get(
-        ApiEndpoints.projects,
+        ApiEndpoints.publicProjects,
         queryParameters: {
           if (cursor != null) 'cursor': cursor,
           if (search != null && search.isNotEmpty) 'search': search,
@@ -28,7 +28,7 @@ class ShowcaseRemoteDatasource {
           'limit': limit,
         },
       );
-      return ProjectPageResult.fromJson(res.data as Map<String, dynamic>);
+      return ProjectPageResult.fromJson(res.data);
     } on DioException catch (e) {
       throw handleDioError(e);
     }

@@ -70,12 +70,41 @@ final showcaseProvider =
 class ShowcaseNotifier extends Notifier<ShowcaseState> {
   @override
   ShowcaseState build() {
-    load();
+    // FIX: Usar Future.microtask para que load() corra DESPUÉS de que
+    // build() retorne y establezca el estado inicial isLoading:true.
+    // Esto evita la race condition donde load() lee isLoading:true del
+    // estado previo y sale sin hacer nada.
+    Future.microtask(() => _loadInitial());
     return const ShowcaseState(isLoading: true);
   }
 
   ShowcaseRemoteDatasource get _ds => ref.read(showcaseDatasourceProvider);
   ShowcaseFilters get _filters => ref.read(showcaseFiltersProvider);
+
+  /// Carga inicial — siempre ejecuta sin guard
+  Future<void> _loadInitial() async {
+    state = const ShowcaseState(isLoading: true);
+    try {
+      final result = await _ds.getProjects(
+        search: _filters.search,
+        category: _filters.category,
+        year: _filters.year,
+      );
+      state = ShowcaseState(
+        projects: result.items,
+        hasMore: result.hasMore,
+        cursor: result.nextCursor,
+        isLoading: false,
+        isRefreshing: false,
+      );
+    } catch (e) {
+      state = ShowcaseState(
+        isLoading: false,
+        isRefreshing: false,
+        error: e.toString(),
+      );
+    }
+  }
 
   /// Carga inicial o recarga
   Future<void> load({bool refresh = false}) async {
@@ -102,6 +131,8 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
         isRefreshing: false,
       );
     } catch (e) {
+      // FIX: Captura cualquier excepción (no solo DioException) para evitar
+      // que el estado quede en isLoading:true indefinidamente.
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,

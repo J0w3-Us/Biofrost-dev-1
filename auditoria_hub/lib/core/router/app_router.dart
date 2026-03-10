@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/models/auth_state.dart';
 import '../../features/auth/pages/login_page.dart';
-import '../../features/auth/pages/register_page.dart';
+import '../../features/auth/pages/complete_profile_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/showcase/pages/showcase_page.dart';
 import '../../features/splash/pages/splash_page.dart';
@@ -71,7 +71,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterPage(),
+        builder: (context, state) => const CompleteProfilePage(),
       ),
       // ── Shell con NavBar ──────────────────────────────────────────────
       ShellRoute(

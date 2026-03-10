@@ -6,7 +6,7 @@ import 'app.dart';
 
 void main() => bootstrap(
       () => const App(environment: AppEnvironment.development),
-      // Sobrescribir el envProvider para que el Dio apunte a localhost en el emulador
+      // Sobrescribir el envProvider (ahora configurado para apuntar a Render en app_config.dart)
       overrides: [
         appEnvironmentProvider.overrideWithValue(AppEnvironment.development),
       ],

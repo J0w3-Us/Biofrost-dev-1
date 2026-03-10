@@ -25,8 +25,42 @@ class RankingPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ranking'),
         automaticallyImplyLeading: false,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ranking',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+              ),
+            ),
+            Text(
+              'Proyectos más destacados',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightMutedFg,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(
+              Icons.emoji_events_rounded,
+              color: AppColors.podiumGold,
+              size: 26,
+            ),
+          ),
+        ],
       ),
       body: state.isLoading
           ? const _RankingSkeletons()
@@ -73,6 +107,13 @@ class RankingPage extends ConsumerWidget {
 
 // ── Podio ──────────────────────────────────────────────────────────────────
 
+/// Aurora gradient constante — identidad Biofrost
+const _auroraGradient = LinearGradient(
+  colors: [Color(0xFFFF6B9D), Color(0xFFFF8C5A), Color(0xFFA855F7)],
+  begin: Alignment.topRight,
+  end: Alignment.bottomLeft,
+);
+
 class _Podium extends StatelessWidget {
   const _Podium({required this.top3, required this.isDark});
   final List<ProjectReadModel> top3;
@@ -87,95 +128,178 @@ class _Podium extends StatelessWidget {
       if (top3.length > 2) (pos: 3, p: top3[2]),
     ];
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: ordered.map((item) {
-        final height = item.pos == 1
-            ? 110.0
-            : item.pos == 2
-                ? 90.0
-                : 75.0;
-        final medal = item.pos == 1
-            ? '🥇'
-            : item.pos == 2
-                ? '🥈'
-                : '🥉';
-        final medalSize = item.pos == 1 ? 28.0 : 22.0;
-        final podiumColor = item.pos == 1
-            ? AppColors.podiumGold
-            : item.pos == 2
-                ? AppColors.podiumSilver
-                : AppColors.podiumBronze;
-
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => context.push('/project/${item.p.id}'),
-            child: Column(
-              children: [
-                Text(medal, style: TextStyle(fontSize: medalSize)),
-                const SizedBox(height: 6),
-                Text(
-                  item.p.title,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: item.pos == 1 ? 12 : 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightForeground,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${item.p.avgScore.toStringAsFixed(1)} pts',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: podiumColor,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  height: height,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        podiumColor.withAlpha(70),
-                        podiumColor.withAlpha(18),
-                      ],
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppRadius.sm),
-                      topRight: Radius.circular(AppRadius.sm),
-                    ),
-                    border:
-                        Border.all(color: podiumColor.withAlpha(130), width: 1),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${item.pos}',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: podiumColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        // Subtle aurora tinted background glass card
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFF6B9D).withAlpha(isDark ? 18 : 12),
+            const Color(0xFFFF8C5A).withAlpha(isDark ? 12 : 8),
+            const Color(0xFFA855F7).withAlpha(isDark ? 18 : 12),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(
+          color: const Color(0xFFFF6B9D).withAlpha(isDark ? 50 : 30),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFA855F7).withAlpha(isDark ? 35 : 20),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: ordered.map((item) {
+          final height = item.pos == 1
+              ? 110.0
+              : item.pos == 2
+                  ? 90.0
+                  : 75.0;
+          final medal = item.pos == 1
+              ? '🥇'
+              : item.pos == 2
+                  ? '🥈'
+                  : '🥉';
+          final medalSize = item.pos == 1 ? 28.0 : 22.0;
+          final podiumColor = item.pos == 1
+              ? AppColors.podiumGold
+              : item.pos == 2
+                  ? AppColors.podiumSilver
+                  : AppColors.podiumBronze;
+
+          // #1 usa aurora gradient en la barra, los otros mantienen su color
+          final barDecoration = item.pos == 1
+              ? BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFFF6B9D),
+                      Color(0xFFFF8C5A),
+                      Color(0xFFA855F7),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.sm),
+                    topRight: Radius.circular(AppRadius.sm),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF6B9D).withAlpha(80),
+                      blurRadius: 14,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                )
+              : BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      podiumColor.withAlpha(70),
+                      podiumColor.withAlpha(18),
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.sm),
+                    topRight: Radius.circular(AppRadius.sm),
+                  ),
+                  border: Border.all(
+                      color: podiumColor.withAlpha(130), width: 1),
+                );
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => context.push('/project/${item.p.id}'),
+              child: Column(
+                children: [
+                  Text(medal, style: TextStyle(fontSize: medalSize)),
+                  const SizedBox(height: 6),
+                  Text(
+                    item.p.title,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: item.pos == 1 ? 12 : 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightForeground,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  // Score: aurora gradient for #1, podium color for others
+                  item.pos == 1
+                      ? ShaderMask(
+                          shaderCallback: (bounds) =>
+                              _auroraGradient.createShader(bounds),
+                          child: Text(
+                            '${item.p.avgScore.toStringAsFixed(1)} pts',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          '${item.p.avgScore.toStringAsFixed(1)} pts',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: podiumColor,
+                          ),
+                        ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: height,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: barDecoration,
+                    child: Center(
+                      child: item.pos == 1
+                          ? ShaderMask(
+                              shaderCallback: (bounds) =>
+                                  _auroraGradient.createShader(bounds),
+                              blendMode: BlendMode.srcIn,
+                              child: const Text(
+                                '1',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              '${item.pos}',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: podiumColor,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -206,6 +330,7 @@ class _RankingRow extends StatelessWidget {
                 horizontal: AppSpacing.sp16, vertical: AppSpacing.sp12),
             child: Row(
               children: [
+                // Position number — aurora for top 4-6
                 SizedBox(
                   width: 28,
                   child: Text(
@@ -236,14 +361,18 @@ class _RankingRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  '${project.avgScore.toStringAsFixed(1)} pts',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                // Score — aurora gradient ShaderMask
+                ShaderMask(
+                  shaderCallback: (bounds) =>
+                      _auroraGradient.createShader(bounds),
+                  child: Text(
+                    '${project.avgScore.toStringAsFixed(1)} pts',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],

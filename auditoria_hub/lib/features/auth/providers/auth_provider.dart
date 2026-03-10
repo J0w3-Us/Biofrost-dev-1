@@ -48,11 +48,37 @@ class AuthNotifier extends Notifier<AuthState> implements ChangeNotifier {
     }
   }
 
+  /// RF-01b: Crear cuenta nueva en Firebase, luego llama al backend para detectar isFirstLogin
+  Future<void> createAccount(LoginCommand cmd) async {
+    state = const AuthLoading();
+    try {
+      final authState = await _datasource.createAccount(cmd);
+      state = authState;
+    } catch (e) {
+      state = AuthError(e.toString());
+    } finally {
+      notifyListeners();
+    }
+  }
+
   /// RF-02: Registro de nuevo usuario
   Future<void> register(RegisterCommand cmd) async {
     state = const AuthLoading();
     try {
       final authState = await _datasource.register(cmd);
+      state = authState;
+    } catch (e) {
+      state = AuthError(e.toString());
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// RF-03: Completar perfil post-login
+  Future<void> completeProfile(CompleteProfileCommand cmd) async {
+    state = const AuthLoading();
+    try {
+      final authState = await _datasource.completeProfile(cmd);
       state = authState;
     } catch (e) {
       state = AuthError(e.toString());

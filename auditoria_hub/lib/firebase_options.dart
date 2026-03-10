@@ -41,8 +41,8 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDPHFvhqCU0sH-_OQx_rOJSMcJ5AhCm7Ho',
-    appId: '1:1008422112612:web:7e6f8d3a9b1c2e4f5g6h7i',
+    apiKey: 'AIzaSyC7ZfJAAewp9ZFn-NlEdPwmnzNmWIogomE',
+    appId: '1:1008422112612:web:665897476f842180e3be71',
     messagingSenderId: '1008422112612',
     projectId: 'integradorhub-dsm',
     authDomain: 'integradorhub-dsm.firebaseapp.com',

@@ -14,34 +14,21 @@ import '../domain/commands/login_command.dart';
 import '../domain/models/auth_state.dart';
 import '../providers/auth_provider.dart';
 
-Color _getRoleColor(String role) {
-  return switch (role) {
-    'Docente' => const Color(0xFF2563EB),
-    'Alumno' => const Color(0xFF16A34A),
-    'SuperAdmin' => const Color(0xFFDC2626),
-    _ => const Color(0xFF9333EA), // Invitado
-  };
-}
 
-class RegisterPage extends ConsumerStatefulWidget {
-  const RegisterPage({super.key});
+class CompleteProfilePage extends ConsumerStatefulWidget {
+  const CompleteProfilePage({super.key});
 
   @override
-  ConsumerState<RegisterPage> createState() => _RegisterPageState();
+  ConsumerState<CompleteProfilePage> createState() => _CompleteProfilePageState();
 }
 
-class _RegisterPageState extends ConsumerState<RegisterPage> {
+class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _apellidoPaternoCtrl = TextEditingController();
   final _apellidoMaternoCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
   final _orgCtrl = TextEditingController();
 
-  bool _obscurePass = true;
-  bool _obscureConfirm = true;
   bool _isLoading = false;
   bool _showWakeUp = false;
   Timer? _wakeUpTimer;
@@ -56,17 +43,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   List<String> _selectedGruposIds = [];
   bool _loadingCatalogs = false;
 
-  // Cache de detección de rol para evitar lookups excesivos
-  String _cachedDetectedRole = 'Invitado';
-  String _lastEmailChecked = '';
-
-  String get _detectedRole {
-    if (_emailCtrl.text != _lastEmailChecked) {
-      _lastEmailChecked = _emailCtrl.text;
-      _cachedDetectedRole = RoleDetector.fromEmail(_emailCtrl.text);
-    }
-    return _cachedDetectedRole;
+  String get _email {
+    final state = ref.read(authStateProvider);
+    if (state is AuthAuthenticated) return state.email;
+    return '';
   }
+
+  String get _firebaseUid {
+    final state = ref.read(authStateProvider);
+    if (state is AuthAuthenticated) return state.uid;
+    return '';
+  }
+
+  String get _detectedRole => RoleDetector.fromEmail(_email);
 
   bool get _isGuest => _detectedRole == 'Invitado';
   bool get _isTeacher => _detectedRole == 'Docente';
@@ -74,19 +63,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   void initState() {
     super.initState();
-    // Optimizar listener con debounce para evitar rebuilds excesivos
-    _emailCtrl.addListener(_onEmailChanged);
-  }
-
-  void _onEmailChanged() {
-    // Solo actualizar UI si el rol realmente cambió
-    final newRole = RoleDetector.fromEmail(_emailCtrl.text);
-    if (newRole != _cachedDetectedRole) {
-      setState(() {
-        _cachedDetectedRole = newRole;
-        _lastEmailChecked = _emailCtrl.text;
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(authStateProvider);
+      if (state is AuthAuthenticated) {
+        final dName = state.displayName;
+        if (dName.isNotEmpty && dName != 'Usuario') {
+          _nameCtrl.text = dName;
+        }
+      }
+    });
   }
 
   Future<void> _loadCarreras() async {
@@ -141,19 +126,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   void dispose() {
-    _emailCtrl.removeListener(_onEmailChanged);
     _wakeUpTimer?.cancel();
     _nameCtrl.dispose();
     _apellidoPaternoCtrl.dispose();
     _apellidoMaternoCtrl.dispose();
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    _confirmCtrl.dispose();
     _orgCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submitRegister() async {
+  Future<void> _submitProfile() async {
     // ── Step 2: sin validación obligatoria — datos pueden ser nulos ──────────
     if (_isTeacher && _registerStep == 2) {
       setState(() => _errorMsg = null);
@@ -185,7 +166,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     });
 
     try {
-      final cmd = RegisterCommand(
+      final cmd = CompleteProfileCommand(
+        firebaseUid: _firebaseUid,
         nombre: _nameCtrl.text.trim(),
         apellidoPaterno: _apellidoPaternoCtrl.text.trim().isNotEmpty
             ? _apellidoPaternoCtrl.text.trim()
@@ -193,22 +175,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         apellidoMaterno: _apellidoMaternoCtrl.text.trim().isNotEmpty
             ? _apellidoMaternoCtrl.text.trim()
             : null,
-        email: _emailCtrl.text.trim(),
-        password: _passCtrl.text,
+        email: _email,
         rol: _detectedRole,
         profesion: null,
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
             : null,
-        carrerasIds: _isTeacher && _selectedCarreraId != null
-            ? [_selectedCarreraId!]
-            : const [],
-        gruposDocente: _isTeacher && _selectedGruposIds.isNotEmpty
-            ? _selectedGruposIds
+        // ── Estructura correcta para el backend C# ───────────────────────────
+        asignaciones: _isTeacher &&
+                _selectedCarreraId != null &&
+                _selectedMateriaId != null
+            ? [
+                DocenteAsignacion(
+                  carreraId: _selectedCarreraId!,
+                  materiaId: _selectedMateriaId!,
+                  gruposIds: _selectedGruposIds,
+                ),
+              ]
             : const [],
       );
 
-      await ref.read(authStateProvider.notifier).register(cmd);
+
+      await ref.read(authStateProvider.notifier).completeProfile(cmd);
 
       if (!mounted) return;
       _wakeUpTimer?.cancel();
@@ -317,7 +305,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _isTeacher && _emailCtrl.text.isNotEmpty
+                            _isTeacher && _email.isNotEmpty
                                 ? 'Paso $_registerStep de 2 · UTM'
                                 : 'Evaluacion de proyectos · UTM',
                             style: TextStyle(
@@ -423,106 +411,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ),
                           const SizedBox(height: 12),
 
-                          // ── Correo ──────────────────────────────────────────
-                          _FieldLabel('Correo electrónico *', isDark: isDark),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              hintText: 'correo@institucion.edu',
-                              prefixIcon: Icon(Icons.email_outlined, size: 18),
-                            ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty)
-                                return 'Ingresa tu correo';
-                              if (!v.contains('@')) return 'Correo inválido';
-                              return null;
-                            },
-                          ),
-
-                          // ── Role badge — aparece al detectar rol ─────────────
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeInOut,
-                            child: _emailCtrl.text.isNotEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 10),
-                                    child: _RoleBadge(
-                                      role: _detectedRole,
-                                      isDark: isDark,
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-
-                          // ── Contraseña ───────────────────────────────────────
-                          _FieldLabel('Contraseña *', isDark: isDark),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _passCtrl,
-                            obscureText: _obscurePass,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              hintText: 'Mínimo 6 caracteres',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                  size: 18),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePass
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: () => setState(
-                                    () => _obscurePass = !_obscurePass),
-                              ),
-                            ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty)
-                                return 'Ingresa una contraseña';
-                              if (v.length < 6) return 'Mínimo 6 caracteres';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          // ── Confirmar contraseña ─────────────────────────────
-                          _FieldLabel('Confirmar contraseña *', isDark: isDark),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _confirmCtrl,
-                            obscureText: _obscureConfirm,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(
-                              hintText: 'Repite tu contraseña',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                  size: 18),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirm
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: () => setState(
-                                    () => _obscureConfirm = !_obscureConfirm),
-                              ),
-                            ),
-                            validator: (v) {
-                              if (v != _passCtrl.text)
-                                return 'Las contraseñas no coinciden';
-                              return null;
-                            },
-                            onFieldSubmitted: (_) => _submitRegister(),
-                          ),
-
                           // ── Organización — solo invitados ─────────────────────
                           AnimatedSize(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeInOut,
-                            child: _emailCtrl.text.isNotEmpty && _isGuest
+                            child: _email.isNotEmpty && _isGuest
                                 ? Padding(
                                     padding: const EdgeInsets.only(top: 12),
                                     child: Column(
@@ -543,7 +436,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                                 size: 18),
                                           ),
                                           onFieldSubmitted: (_) =>
-                                              _submitRegister(),
+                                              _submitProfile(),
                                         ),
                                       ],
                                     ),
@@ -747,20 +640,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
                         const SizedBox(height: 24),
                         BioButton(
-                          label: _isTeacher && _registerStep == 1
-                              ? 'Continuar →'
-                              : 'Crear cuenta',
+                          label: (_isTeacher && _registerStep == 1)
+                              ? 'Continuar'
+                              : 'Finalizar',
                           isLoading: _isLoading || _loadingCatalogs,
-                          onPressed: _submitRegister,
+                          onPressed: _submitProfile,
                         ),
-                        if (_registerStep == 1) ...[
-                          const SizedBox(height: 14),
-                          TextButton(
-                            onPressed: () => context.go('/login'),
-                            child:
-                                const Text('¿Ya tienes cuenta? Inicia sesión'),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -777,93 +662,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 // ── Subwidgets ──────────────────────────────────────────────────────────────
 // Alias local para mantener compat con el widget tree existente
 typedef _FieldLabel = FormLabel;
-
-// ── Role badge — tarjeta de rol detectado ─────────────────────────────────
-
-class _RoleBadge extends StatelessWidget {
-  const _RoleBadge({required this.role, required this.isDark});
-  final String role;
-  final bool isDark;
-
-  IconData get _icon => switch (role) {
-        'Docente' => Icons.school_rounded,
-        'Alumno' => Icons.person_rounded,
-        'SuperAdmin' => Icons.admin_panel_settings_rounded,
-        _ => Icons.business_center_rounded,
-      };
-
-  String get _description => switch (role) {
-        'Docente' => 'Correo docente UTM — acceso al panel de enseñanza',
-        'Alumno' => 'Correo alumno UTM — acceso a proyectos y evaluaciones',
-        'SuperAdmin' => 'Cuenta de administrador — acceso total al sistema',
-        _ => 'Correo externo — acceso como invitado',
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _getRoleColor(role);
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 260),
-      transitionBuilder: (child, anim) =>
-          FadeTransition(opacity: anim, child: child),
-      child: Container(
-        key: ValueKey(role),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: isDark ? color.withAlpha(18) : color.withAlpha(12),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: color.withAlpha(50)),
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              // Barra lateral de acento
-              Container(width: 4, color: color),
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Icon(_icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        role,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _description,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightMutedFg,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Diálogo de éxito de registro — inspirado en 10.svg ─────────────────────
 

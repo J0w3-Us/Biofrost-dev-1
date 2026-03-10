@@ -29,22 +29,8 @@ class ProfilePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfil'),
+        title: const Text('Mi Perfil'),
         automaticallyImplyLeading: false,
-        actions: [
-          TextButton(
-            onPressed: () => _confirmLogout(context, ref),
-            child: const Text(
-              'Salir',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.error,
-              ),
-            ),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.sp40),
@@ -132,7 +118,7 @@ class ProfilePage extends ConsumerWidget {
                   _InfoRow(
                     icon: Icons.badge_outlined,
                     label: 'Rol',
-                    value: auth.role.toUpperCase(),
+                    value: _capitalize(auth.role),
                     isDark: isDark,
                   ),
                   const SizedBox(height: AppSpacing.sp12),
@@ -216,6 +202,11 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
+  String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  }
+
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -277,8 +268,8 @@ class _ProfileHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? [AppColors.darkSurface1, AppColors.darkSurface2]
-              : [AppColors.lightSidebar, AppColors.lightSecondary],
+              ? [AppColors.darkSurface1, AppColors.darkSurface0]
+              : [AppColors.lightCard, AppColors.lightMuted],
         ),
       ),
       padding: const EdgeInsets.symmetric(

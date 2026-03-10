@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/bio_empty_state.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../domain/models/teacher_project_model.dart';
@@ -57,8 +58,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return Scaffold(
       backgroundColor:
           isDark ? AppColors.darkSurface0 : AppColors.lightBackground,
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
         child: CustomScrollView(
           slivers: [
             // ── Header ─────────────────────────────────────────────────
@@ -76,7 +79,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: dash.isLoading
                     ? const SizedBox(
-                        height: 90,
+                        height: 120,
                         child: Center(child: CircularProgressIndicator()),
                       )
                     : Row(
@@ -154,19 +157,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               )
             else if (filtered.isEmpty)
               SliverFillRemaining(
-                child: Center(
-                  child: Text(
-                    dash.projects.isEmpty
-                        ? 'No tienes proyectos asignados'
-                        : 'Sin resultados para "$_query"',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightMutedFg,
-                    ),
-                  ),
-                ),
+                child: dash.projects.isEmpty
+                    ? _HeroBanner(isDark: isDark)
+                    : BioEmptyState(
+                        title: 'Sin resultados',
+                        subtitle: 'No se encontraron proyectos para "$_query".',
+                        icon: Icons.search_off_rounded,
+                        isDark: isDark,
+                      ),
               )
             else
               SliverPadding(
@@ -187,6 +185,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
+        ),
       ),
     );
   }
@@ -202,45 +201,79 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A5F), Color(0xFF2563EB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Buenos días'
+        : hour < 18
+            ? 'Buenas tardes'
+            : 'Buenas noches';
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.school_rounded, color: Colors.white, size: 32),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hola, $teacherName',
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Panel de evaluaciones',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              ],
+          // Avatar — aurora gradient ring (identidad Biofrost)
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFFF6B9D),
+                  Color(0xFFFF8C5A),
+                  Color(0xFFA855F7),
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              shape: BoxShape.circle,
             ),
+            child: Padding(
+              padding: const EdgeInsets.all(2.5),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.school_rounded,
+                  color: isDark
+                      ? const Color(0xFFFF8C5A)
+                      : const Color(0xFFA855F7),
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting, $teacherName 👋',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Panel de evaluaciones',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: textSecondary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -248,14 +281,14 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
-// ── Stat Card ──────────────────────────────────────────────────────────────
+// ── Stat Card ── Aurora Pill Button (identidad Biofrost) ────────────────
 
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.label,
     required this.value,
     required this.icon,
-    required this.color,
+    required this.color, // kept for API compat but not used directly
     required this.isDark,
   });
 
@@ -267,47 +300,308 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+    // Deep jewel-tone dark gradient — premium, not candy
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface1 : Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightForeground,
-            ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        // Soft indigo glow — subtle, not loud
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withAlpha(isDark ? 55 : 30),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 10,
-              color:
-                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
-            ),
-            textAlign: TextAlign.center,
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withAlpha(isDark ? 45 : 25),
+            blurRadius: 22,
+            spreadRadius: -2,
+            offset: const Offset(0, 6),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: Stack(
+          children: [
+            // ── Deep jewel gradient fill ─────────────────────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  // Dark indigo top → deep violet bottom — luminous from darkness
+                  colors: [
+                    Color(0xFF1E1B4B), // deep indigo
+                    Color(0xFF2D1B69), // rich violet
+                    Color(0xFF1A0A3A), // near-black violet
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon with a subtle aurora tint glow behind it
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(28),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.withAlpha(70),
+                        width: 1,
+                      ),
+                    ),
+                    child: Icon(icon, color: color, size: 22),
+                  ),
+                  const SizedBox(height: 12),
+                  // Number — bright white, big
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Label — muted white
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withAlpha(140),
+                      letterSpacing: 0.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Thin specular line — just 16px, feathered, no division ──
+            Positioned(
+              top: 0,
+              left: 6,
+              right: 6,
+              height: 16,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.xl),
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withAlpha(38),
+                      Colors.white.withAlpha(0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Left luminous edge accent ──────────────────────────────
+            Positioned(
+              top: 12,
+              left: 0,
+              bottom: 12,
+              width: 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withAlpha(0),
+                      Colors.white.withAlpha(30),
+                      Colors.white.withAlpha(0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
+// ── Hero Banner ── Estado vacío, editorial y elegante ───────────────────
+
+class _HeroBanner extends StatelessWidget {
+  const _HeroBanner({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          // Subtle indigo glow — deep, not loud
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withAlpha(isDark ? 70 : 40),
+              blurRadius: 28,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFF7C3AED).withAlpha(isDark ? 55 : 30),
+              blurRadius: 40,
+              spreadRadius: -6,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          child: Stack(
+            children: [
+              // ── Deep dark gradient — like a night sky ──────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 28, vertical: 44),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF0F0C2E), // deep midnight
+                      Color(0xFF1A1040), // dark indigo
+                      Color(0xFF2D1B69), // rich violet — aurora accent
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon circle — aurora border ring, dark inside
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF6366F1),
+                            Color(0xFFA855F7),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6366F1).withAlpha(100),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2.5),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF13102E),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.pending_actions_rounded,
+                            color: Color(0xFF818CF8),
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    // Heading — clean, editorial
+                    const Text(
+                      'Sin proyectos aún',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    // Body — calm, secondary
+                    Text(
+                      'Cuando te asignen proyectos para evaluar,\naparecerán aquí.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        height: 1.6,
+                        color: Colors.white.withAlpha(150),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Thin specular line only (no division effect) ──────
+              Positioned(
+                top: 0,
+                left: 8,
+                right: 8,
+                height: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.xl),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withAlpha(30),
+                        Colors.white.withAlpha(0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Subtle aurora radial glow — bottom right ──────────
+              Positioned(
+                bottom: -30,
+                right: -20,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF7C3AED).withAlpha(60),
+                        const Color(0xFF7C3AED).withAlpha(0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 // ── Project Row ────────────────────────────────────────────────────────────
 
@@ -356,14 +650,14 @@ class _ProjectRow extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(color: borderColor),
         ),
         child: Row(
           children: [
             // Thumbnail o placeholder
             ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               child: project.thumbnailUrl != null
                   ? Image.network(
                       project.thumbnailUrl!,

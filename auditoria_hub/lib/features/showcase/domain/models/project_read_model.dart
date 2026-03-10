@@ -33,25 +33,39 @@ class ProjectReadModel extends Equatable {
 
   factory ProjectReadModel.fromJson(Map<String, dynamic> json) =>
       ProjectReadModel(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String? ?? '',
-        category: json['category'] as String? ?? '',
-        year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
-        teamName: json['teamName'] as String? ?? '',
-        avgScore: (json['avgScore'] as num?)?.toDouble() ?? 0.0,
-        totalVotes: (json['totalVotes'] as num?)?.toInt() ?? 0,
-        status: json['status'] as String? ?? 'active',
-        coverImageUrl: json['coverImageUrl'] as String?,
-        techStack: List<String>.from(json['techStack'] as List? ?? []),
+        id: (json['id'] ?? json['_id'] ?? '').toString(),
+        // API devuelve 'titulo' (español); fallback a 'title'
+        title: (json['titulo'] ?? json['title'] ?? 'Sin título').toString(),
+        description: (json['descripcion'] ?? json['description'] ?? '').toString(),
+        category: (json['materia'] ?? json['category'] ?? '').toString(),
+        // 'ciclo' viene como "2026-1" → extraemos el año
+        year: _parseYear(json['ciclo'] ?? json['year']),
+        teamName: (json['liderNombre'] ?? json['teamName'] ?? json['nombre'] ?? '').toString(),
+        avgScore: ((json['calificacion'] ?? json['avgScore']) as num? ?? 0).toDouble(),
+        totalVotes: ((json['conteoVotos'] ?? json['totalVotes']) as num? ?? 0).toInt(),
+        status: (json['estado'] ?? json['status'] ?? 'active').toString(),
+        coverImageUrl: (json['thumbnailUrl'] ?? json['coverImageUrl']) as String?,
+        techStack: List<String>.from(
+          (json['stackTecnologico'] ?? json['techStack']) as List? ?? [],
+        ),
         tags: List<String>.from(json['tags'] as List? ?? []),
       );
+
+  static int _parseYear(dynamic raw) {
+    if (raw == null) return DateTime.now().year;
+    if (raw is int) return raw;
+    final s = raw.toString();
+    // "2026-1" → 2026
+    final match = RegExp(r'(\d{4})').firstMatch(s);
+    if (match != null) return int.tryParse(match.group(1)!) ?? DateTime.now().year;
+    return int.tryParse(s) ?? DateTime.now().year;
+  }
 
   @override
   List<Object?> get props => [id, title, avgScore, totalVotes, status];
 }
 
-/// Modelo para la lista paginada
+/// Modelo para la lista paginada — soporta array directo y objeto paginado
 class ProjectPageResult extends Equatable {
   const ProjectPageResult({
     required this.items,
@@ -65,15 +79,30 @@ class ProjectPageResult extends Equatable {
   final bool hasMore;
   final int total;
 
-  factory ProjectPageResult.fromJson(Map<String, dynamic> json) =>
-      ProjectPageResult(
-        items: (json['items'] as List)
-            .map((e) => ProjectReadModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        nextCursor: json['nextCursor'] as String?,
-        hasMore: json['hasMore'] as bool? ?? false,
-        total: (json['total'] as num?)?.toInt() ?? 0,
+  factory ProjectPageResult.fromJson(dynamic raw) {
+    // Si el API devuelve un array directo (respuesta actual: [...])
+    if (raw is List) {
+      final items = raw
+          .map((e) => ProjectReadModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return ProjectPageResult(
+        items: items,
+        nextCursor: null,
+        hasMore: false,
+        total: items.length,
       );
+    }
+    // Si el API devuelve objeto paginado { items: [...], hasMore, nextCursor }
+    final json = raw as Map<String, dynamic>;
+    return ProjectPageResult(
+      items: (json['items'] as List? ?? [])
+          .map((e) => ProjectReadModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      nextCursor: json['nextCursor'] as String?,
+      hasMore: json['hasMore'] as bool? ?? false,
+      total: (json['total'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   @override
   List<Object?> get props => [items, nextCursor, hasMore, total];

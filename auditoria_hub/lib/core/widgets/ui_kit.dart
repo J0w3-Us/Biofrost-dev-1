@@ -384,8 +384,8 @@ class _BioSkeletonState extends State<BioSkeleton>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? AppColors.darkSurface2 : AppColors.lightMuted;
-    final highlight = isDark ? AppColors.darkSurface3 : const Color(0xFFEDE9F4);
+    final base = isDark ? AppColors.darkSurface2 : AppColors.lightSecondary;
+    final highlight = isDark ? AppColors.darkSurface3 : AppColors.lightCard;
 
     return AnimatedBuilder(
       animation: _anim,
