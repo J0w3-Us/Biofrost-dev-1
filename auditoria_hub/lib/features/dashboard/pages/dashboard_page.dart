@@ -81,40 +81,50 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     ? const SizedBox(
                         height: 120,
                         child: Center(child: CircularProgressIndicator()),
-                      )
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: _StatCard(
-                              label: 'Total',
-                              value: '${dash.total}',
-                              icon: Icons.folder_outlined,
-                              color: const Color(0xFF2563EB),
-                              isDark: isDark,
+                      ) // Added missing ')' here
+                    : Column(
+                          children: [
+                            // Top row: Total spans full width
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    label: 'Total de Proyectos',
+                                    value: '${dash.total}',
+                                    icon: Icons.folder_outlined,
+                                    color: const Color(0xFF3B82F6), // Blue
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _StatCard(
-                              label: 'Pendientes',
-                              value: '${dash.pendientes}',
-                              icon: Icons.access_time_rounded,
-                              color: const Color(0xFFF59E0B),
-                              isDark: isDark,
+                            const SizedBox(height: 12),
+                            // Bottom row: Pendientes and Aprobados
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    label: 'Pendientes',
+                                    value: '${dash.pendientes}',
+                                    icon: Icons.access_time_rounded,
+                                    color: const Color(0xFFF59E0B), // Amber
+                                    isDark: isDark,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _StatCard(
+                                    label: 'Aprobados',
+                                    value: '${dash.aprobados}',
+                                    icon: Icons.check_circle_outline_rounded,
+                                    color: const Color(0xFF10B981), // Emerald
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _StatCard(
-                              label: 'Aprobados',
-                              value: '${dash.aprobados}',
-                              icon: Icons.check_circle_outline_rounded,
-                              color: AppColors.success,
-                              isDark: isDark,
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
               ),
             ),
 
@@ -157,6 +167,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               )
             else if (filtered.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: dash.projects.isEmpty
                     ? _HeroBanner(isDark: isDark)
                     : BioEmptyState(
@@ -201,81 +212,56 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Buenos días'
-        : hour < 18
-            ? 'Buenas tardes'
-            : 'Buenas noches';
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Avatar — aurora gradient ring (identidad Biofrost)
-          Container(
-            width: 46,
-            height: 46,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFFFF6B9D),
-                  Color(0xFFFF8C5A),
-                  Color(0xFFA855F7),
-                ],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(2.5),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.school_rounded,
-                  color: isDark
-                      ? const Color(0xFFFF8C5A)
-                      : const Color(0xFFA855F7),
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$greeting, $teacherName 👋',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                  color: textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Panel de evaluaciones',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: textSecondary,
-                ),
-              ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF0D1B3E), // deep navy
+              Color(0xFF1A2B5A), // mid blue
+              Color(0xFF0A1628), // dark ink
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1A2B5A).withAlpha(100),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Hola, $teacherName 👋',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Viendo tus proyectos asignados',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: Colors.white.withAlpha(180),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -288,7 +274,7 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    required this.color, // kept for API compat but not used directly
+    required this.color,
     required this.isDark,
   });
 
@@ -300,132 +286,94 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Deep jewel-tone dark gradient — premium, not candy
-    return DecoratedBox(
+    final bgColor = isDark ? const Color(0xFF161618) : Colors.white;
+    final borderColor = isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10);
+    
+    return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        // Soft indigo glow — subtle, not loud
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withAlpha(isDark ? 55 : 30),
-            blurRadius: 16,
+            color: Colors.black.withAlpha(isDark ? 40 : 10),
+            blurRadius: 10,
             offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: const Color(0xFF7C3AED).withAlpha(isDark ? 45 : 25),
-            blurRadius: 22,
-            spreadRadius: -2,
-            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // ── Deep jewel gradient fill ─────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 10),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  // Dark indigo top → deep violet bottom — luminous from darkness
-                  colors: [
-                    Color(0xFF1E1B4B), // deep indigo
-                    Color(0xFF2D1B69), // rich violet
-                    Color(0xFF1A0A3A), // near-black violet
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+            // Inner top highlight (simulating glassmorphism specular reflection)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 40,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withAlpha(isDark ? 15 : 40),
+                      Colors.white.withAlpha(0),
+                    ],
+                  ),
                 ),
               ),
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icon with a subtle aurora tint glow behind it
+                  // Icon with localized glow
                   Container(
-                    width: 46,
-                    height: 46,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: color.withAlpha(28),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: color.withAlpha(70),
-                        width: 1,
-                      ),
+                      color: color.withAlpha(isDark ? 30 : 20),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color.withAlpha(isDark ? 60 : 40), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withAlpha(isDark ? 40 : 20),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: Icon(icon, color: color, size: 22),
+                    child: Icon(icon, color: color, size: 20),
                   ),
-                  const SizedBox(height: 12),
-                  // Number — bright white, big
+                  const SizedBox(height: 16),
+                  // Value (Large number)
                   Text(
                     value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -1,
-                      color: Colors.white,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Label — muted white
+                  // Label
                   Text(
                     label,
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white.withAlpha(140),
-                      letterSpacing: 0.4,
+                      color: isDark ? Colors.white70 : Colors.black54,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ],
-              ),
-            ),
-
-            // ── Thin specular line — just 16px, feathered, no division ──
-            Positioned(
-              top: 0,
-              left: 6,
-              right: 6,
-              height: 16,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppRadius.xl),
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withAlpha(38),
-                      Colors.white.withAlpha(0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Left luminous edge accent ──────────────────────────────
-            Positioned(
-              top: 12,
-              left: 0,
-              bottom: 12,
-              width: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withAlpha(0),
-                      Colors.white.withAlpha(30),
-                      Colors.white.withAlpha(0),
-                    ],
-                  ),
-                ),
               ),
             ),
           ],
@@ -443,158 +391,109 @@ class _HeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          // Subtle indigo glow — deep, not loud
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF6366F1).withAlpha(isDark ? 70 : 40),
-              blurRadius: 28,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: const Color(0xFF7C3AED).withAlpha(isDark ? 55 : 30),
-              blurRadius: 40,
-              spreadRadius: -6,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          child: Stack(
-            children: [
-              // ── Deep dark gradient — like a night sky ──────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 28, vertical: 44),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF0F0C2E), // deep midnight
-                      Color(0xFF1A1040), // dark indigo
-                      Color(0xFF2D1B69), // rich violet — aurora accent
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Icon circle — aurora border ring, dark inside
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF6366F1),
-                            Color(0xFFA855F7),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6366F1).withAlpha(100),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2.5),
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF13102E),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.pending_actions_rounded,
-                            color: Color(0xFF818CF8),
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    // Heading — clean, editorial
-                    const Text(
-                      'Sin proyectos aún',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    // Body — calm, secondary
-                    Text(
-                      'Cuando te asignen proyectos para evaluar,\naparecerán aquí.',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        height: 1.6,
-                        color: Colors.white.withAlpha(150),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Thin specular line only (no division effect) ──────
-              Positioned(
-                top: 0,
-                left: 8,
-                right: 8,
-                height: 12,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(AppRadius.xl),
-                    ),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withAlpha(30),
-                        Colors.white.withAlpha(0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // ── Subtle aurora radial glow — bottom right ──────────
-              Positioned(
-                bottom: -30,
-                right: -20,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF7C3AED).withAlpha(60),
-                        const Color(0xFF7C3AED).withAlpha(0),
-                      ],
-                    ),
-                  ),
-                ),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3B82F6).withAlpha(isDark ? 80 : 40),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
               ),
             ],
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF06B6D4), // Cyan 500
+                Color(0xFF3B82F6), // Blue 500
+                Color(0xFF4F46E5), // Indigo 600
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon circle — white border, translucent center
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withAlpha(200), width: 1.5),
+                          color: Colors.white.withAlpha(20),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.rocket_launch_rounded,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Heading
+                      const Text(
+                        'Todo listo, profesor',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.8,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      // Body
+                      Text(
+                        'Cuando te asignen un proyecto para evaluar,\naparecerá justo aquí.',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 1.5,
+                          color: Colors.white.withAlpha(230),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Specular highlight (top curve) ──
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 24,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withAlpha(50),
+                          Colors.white.withAlpha(0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -67,6 +67,31 @@ class ShowcaseState {
 final showcaseProvider =
     NotifierProvider<ShowcaseNotifier, ShowcaseState>(ShowcaseNotifier.new);
 
+// ── Provider de proyectos filtrados (Local) ───────────────────────────────
+final filteredProjectsProvider = Provider<List<ProjectReadModel>>((ref) {
+  final projects = ref.watch(showcaseProvider).projects;
+  final filters = ref.watch(showcaseFiltersProvider);
+
+  var list = projects;
+  final q = filters.search.toLowerCase();
+  
+  if (q.isNotEmpty) {
+    list = list.where((p) => 
+      p.title.toLowerCase().contains(q) ||
+      p.description.toLowerCase().contains(q) ||
+      p.teamName.toLowerCase().contains(q) ||
+      p.techStack.any((t) => t.toLowerCase().contains(q)) ||
+      p.tags.any((t) => t.toLowerCase().contains(q))
+    ).toList();
+  }
+
+  if (filters.category != null && filters.category!.isNotEmpty) {
+    list = list.where((p) => p.techStack.contains(filters.category)).toList();
+  }
+
+  return list;
+});
+
 class ShowcaseNotifier extends Notifier<ShowcaseState> {
   @override
   ShowcaseState build() {
@@ -86,9 +111,8 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
     state = const ShowcaseState(isLoading: true);
     try {
       final result = await _ds.getProjects(
-        search: _filters.search,
-        category: _filters.category,
-        year: _filters.year,
+        // Los filtros ahora son locales para esta version p/ evitar llamadas innecesarias al API
+        // si el API es un array directo.
       );
       state = ShowcaseState(
         projects: result.items,
@@ -117,11 +141,7 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
     );
 
     try {
-      final result = await _ds.getProjects(
-        search: _filters.search,
-        category: _filters.category,
-        year: _filters.year,
-      );
+      final result = await _ds.getProjects();
 
       state = state.copyWith(
         projects: result.items,
@@ -148,9 +168,6 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
     try {
       final result = await _ds.getProjects(
         cursor: state.cursor,
-        search: _filters.search,
-        category: _filters.category,
-        year: _filters.year,
       );
 
       state = state.copyWith(
@@ -161,9 +178,8 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
     } catch (_) {}
   }
 
-  /// Aplica filtros y recarga
+  /// Aplica filtros localmente sin recargar de API
   void applyFilter(ShowcaseFilters filters) {
     ref.read(showcaseFiltersProvider.notifier).state = filters;
-    load(refresh: true);
   }
 }

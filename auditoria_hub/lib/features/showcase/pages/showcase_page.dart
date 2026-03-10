@@ -8,6 +8,7 @@ import '../../../core/widgets/bio_empty_state.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../../features/auth/domain/models/auth_state.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import '../domain/models/project_read_model.dart';
 import '../providers/showcase_provider.dart';
 import '../widgets/project_card.dart';
 
@@ -23,6 +24,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   String _selectedTech = '';
+  bool _isSearchExpanded = false;
 
   // For a subtle fade-in animation on the greeting
   late final AnimationController _greetCtrl;
@@ -67,6 +69,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(showcaseProvider);
+    final filteredProjects = ref.watch(filteredProjectsProvider);
     final filters = ref.watch(showcaseFiltersProvider);
     final auth = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -74,153 +77,149 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
     final userName = auth is AuthAuthenticated ? auth.displayName : null;
     final techs = _extractTechs(state.projects);
 
-    // Dynamic greeting
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Buenos días'
-        : hour < 18
-            ? 'Buenas tardes'
-            : 'Buenas noches';
-    final firstName = (userName ?? 'allí').split(' ').first;
-
     return Scaffold(
       body: NestedScrollView(
         controller: _scrollCtrl,
         headerSliverBuilder: (ctx, innerBoxIsScrolled) => [
           // ── SliverAppBar (floating — hides on scroll down) ──────────────
           SliverAppBar(
-            floating: false,
-            snap: false,
+            floating: true,
+            snap: true,
             pinned: true,
             backgroundColor:
                 isDark ? AppColors.darkSurface0 : AppColors.lightBackground,
             surfaceTintColor: Colors.transparent,
-            bottom: PreferredSize(
-              preferredSize: Size.fromHeight(techs.isNotEmpty ? 96 : 56),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: isDark
-                          ? AppColors.darkBorder
-                          : AppColors.lightBorder,
-                      width: 0.5,
-                    ),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    // ── Search bar ──────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                      child: TextField(
-                        controller: _searchCtrl,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
+            title: _isSearchExpanded
+                ? SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: _searchCtrl,
+                      autofocus: true,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: isDark
+                            ? AppColors.darkTextPrimary
+                            : AppColors.lightForeground,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar proyectos...',
+                        hintStyle: TextStyle(
                           fontSize: 14,
                           color: isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.lightForeground,
+                              ? AppColors.darkTextDisabled
+                              : AppColors.lightMutedFg,
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar proyectos, tecnologías...',
-                          hintStyle: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? AppColors.darkTextDisabled
-                                : AppColors.lightMutedFg,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          size: 17,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightMutedFg,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
                             size: 17,
                             color: isDark
                                 ? AppColors.darkTextSecondary
                                 : AppColors.lightMutedFg,
                           ),
-                          suffixIcon: _searchCtrl.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.cancel_rounded,
-                                    size: 17,
-                                    color: isDark
-                                        ? AppColors.darkTextSecondary
-                                        : AppColors.lightMutedFg,
-                                  ),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    ref
-                                        .read(showcaseProvider.notifier)
-                                        .applyFilter(
-                                            filters.copyWith(search: ''));
-                                    setState(() {});
-                                  },
-                                )
-                              : null,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                          filled: true,
-                          fillColor: isDark
-                              ? AppColors.darkSurface2
-                              : AppColors.lightMuted,
-                          border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.full),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.full),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.full),
-                            borderSide: BorderSide(
-                              color: isDark
-                                  ? AppColors.darkAccent
-                                  : AppColors.lightAccent,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        onChanged: (q) {
-                          setState(() {});
-                          Future.delayed(
-                              const Duration(milliseconds: 300), () {
-                            if (_searchCtrl.text == q) {
+                          onPressed: () {
+                            if (_searchCtrl.text.isEmpty) {
+                              setState(() => _isSearchExpanded = false);
+                            } else {
+                              _searchCtrl.clear();
                               ref
                                   .read(showcaseProvider.notifier)
-                                  .applyFilter(
-                                      filters.copyWith(search: q));
+                                  .applyFilter(filters.copyWith(search: ''));
+                              setState(() {});
                             }
-                          });
-                        },
+                          },
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        filled: true,
+                        fillColor: isDark
+                            ? AppColors.darkSurface2
+                            : AppColors.lightMuted,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
+                      onChanged: (q) {
+                        setState(() {});
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (_searchCtrl.text == q) {
+                            ref
+                                .read(showcaseProvider.notifier)
+                                .applyFilter(filters.copyWith(search: q));
+                          }
+                        });
+                      },
                     ),
-                    // ── Tech chips ──────────────────────────────────────
-                    if (techs.isNotEmpty)
-                      SizedBox(
+                  )
+                : Text(
+                    'Explorar',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightForeground,
+                    ),
+                  ),
+            actions: [
+              if (!_isSearchExpanded)
+                IconButton(
+                  icon: Icon(
+                    Icons.search_rounded,
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightForeground,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isSearchExpanded = true;
+                    });
+                  },
+                ),
+              const SizedBox(width: 8),
+            ],
+            bottom: techs.isNotEmpty
+                ? PreferredSize(
+                    preferredSize: const Size.fromHeight(48),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isDark
+                                ? AppColors.darkBorder
+                                : AppColors.lightBorder,
+                            width: 0.5,
+                          ),
+                        ),
+                      ),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
                         height: 36,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: techs.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 6),
+                          separatorBuilder: (_, __) => const SizedBox(width: 6),
                           itemBuilder: (_, i) => BioChip(
                             label: techs[i],
                             isSelected: _selectedTech == techs[i],
                             onTap: () {
                               setState(() {
                                 _selectedTech =
-                                    _selectedTech == techs[i]
-                                        ? ''
-                                        : techs[i];
+                                    _selectedTech == techs[i] ? '' : techs[i];
                               });
-                              ref
-                                  .read(showcaseProvider.notifier)
-                                  .applyFilter(filters.copyWith(
+                              ref.read(showcaseProvider.notifier).applyFilter(
+                                  filters.copyWith(
                                       category: _selectedTech.isEmpty
                                           ? null
                                           : _selectedTech));
@@ -228,21 +227,18 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
                           ),
                         ),
                       ),
-                    const SizedBox(height: 6),
-                  ],
-                ),
-              ),
-            ),
+                    ),
+                  )
+                : null,
           ),
         ],
-        body: _buildBody(state, filters, isDark, greeting, firstName),
+        body: _buildBody(state, filteredProjects, filters, isDark),
       ),
     );
   }
 
   Widget _buildBody(
-      ShowcaseState state, ShowcaseFilters filters, bool isDark,
-      String greeting, String firstName) {
+      ShowcaseState state, List<ProjectReadModel> filteredProjects, ShowcaseFilters filters, bool isDark) {
     if (state.isLoading) {
       return _buildSkeletons(isDark);
     }
@@ -254,14 +250,14 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
       );
     }
 
-    if (!state.isLoading && state.projects.isEmpty) {
+    if (!state.isLoading && filteredProjects.isEmpty) {
       final isFiltered =
           filters.search.isNotEmpty || filters.category != null;
       return BioEmptyState(
-        title: isFiltered ? 'Sin resultados' : 'Sin proyectos',
+        title: isFiltered ? 'Sin resultados' : 'Aún no hay proyectos',
         subtitle: isFiltered
             ? 'Intenta con otro término de búsqueda'
-            : 'Aún no hay proyectos registrados en el Hub.',
+            : 'Los proyectos aparecerán aquí pronto.',
         icon: isFiltered
             ? Icons.search_off_rounded
             : Icons.folder_open_rounded,
@@ -278,53 +274,15 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
       child: ListView.builder(
         padding: const EdgeInsets.only(
             top: 0, bottom: AppSpacing.sp64 + AppSpacing.sp24),
-        itemCount: state.projects.length + 1 + (state.hasMore ? 2 : 0),
+        itemCount: filteredProjects.length + (state.hasMore ? 2 : 0),
         itemBuilder: (ctx, i) {
-          // ── Item 0: Greeting header ──────────────────────────────
-          if (i == 0) {
-            return FadeTransition(
-              opacity: _greetFade,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$greeting, $firstName 👋',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.7,
-                        color: isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightForeground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Descubre los proyectos del hub',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightMutedFg,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final projectIndex = i - 1;
+          final projectIndex = i;
 
           // Loading skeletons at the end
-          if (projectIndex >= state.projects.length) {
+          if (projectIndex >= filteredProjects.length) {
             return _SkeletonFeedCard(isDark: isDark);
           }
-          final project = state.projects[projectIndex];
+          final project = filteredProjects[projectIndex];
           // Animate each card on entry
           return _AnimatedFeedItem(
             index: i,

@@ -459,11 +459,14 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                             )
                           else
                             DropdownButtonFormField<String>(
+                              isExpanded: true,
                               value: _selectedCarreraId,
                               hint: Text(
                                 _carreras.isEmpty
                                     ? 'No hay datos disponibles'
                                     : 'Selecciona tu carrera',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               decoration: const InputDecoration(
                                 prefixIcon:
@@ -473,7 +476,11 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                   .map((c) => DropdownMenuItem<String>(
                                         value: c['id'] as String?,
                                         child:
-                                            Text(c['nombre'] as String? ?? ''),
+                                            Text(
+                                              c['nombre'] as String? ?? '',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                       ))
                                   .toList(),
                               onChanged:
@@ -493,6 +500,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                             )
                           else
                             DropdownButtonFormField<String>(
+                              isExpanded: true,
                               value: _selectedMateriaId,
                               hint: Text(
                                 _selectedCarreraId == null
@@ -500,6 +508,8 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                     : _availableMaterias.isEmpty
                                         ? 'No hay datos disponibles'
                                         : 'Selecciona la materia que impartes',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               decoration: const InputDecoration(
                                 prefixIcon: Icon(Icons.book_outlined, size: 18),
@@ -513,6 +523,8 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                   child: Text(
                                     '${m['nombre'] ?? ''} '
                                     '(${m['cuatrimestre'] ?? ''}°)',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 );
                               }).toList(),
