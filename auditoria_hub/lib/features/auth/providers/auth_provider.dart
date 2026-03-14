@@ -108,9 +108,63 @@ class AuthNotifier extends Notifier<AuthState> implements ChangeNotifier {
       organizacion: current.organizacion,
       especialidadDocente: current.especialidadDocente,
       createdAt: current.createdAt,
+      socialLinks: current.socialLinks,
     );
     notifyListeners();
   }
+
+  /// Actualiza redes sociales en el estado local tras guardado exitoso.
+  void updateSocialLinksInState(Map<String, String> links) {
+    final current = state;
+    if (current is! AuthAuthenticated) return;
+    state = AuthAuthenticated(
+      uid: current.uid,
+      email: current.email,
+      displayName: current.displayName,
+      role: current.role,
+      photoUrl: current.photoUrl,
+      isFirstLogin: current.isFirstLogin,
+      grupoId: current.grupoId,
+      grupoNombre: current.grupoNombre,
+      matricula: current.matricula,
+      carreraId: current.carreraId,
+      apellidoPaterno: current.apellidoPaterno,
+      apellidoMaterno: current.apellidoMaterno,
+      profesion: current.profesion,
+      organizacion: current.organizacion,
+      especialidadDocente: current.especialidadDocente,
+      createdAt: current.createdAt,
+      socialLinks: links,
+    );
+    notifyListeners();
+  }
+
+  /// Actualiza el nombre de display en el estado local tras guardado exitoso.
+  void updateDisplayNameInState(String name) {
+    final current = state;
+    if (current is! AuthAuthenticated) return;
+    state = AuthAuthenticated(
+      uid: current.uid,
+      email: current.email,
+      displayName: name,
+      role: current.role,
+      photoUrl: current.photoUrl,
+      isFirstLogin: current.isFirstLogin,
+      grupoId: current.grupoId,
+      grupoNombre: current.grupoNombre,
+      matricula: current.matricula,
+      carreraId: current.carreraId,
+      apellidoPaterno: current.apellidoPaterno,
+      apellidoMaterno: current.apellidoMaterno,
+      profesion: current.profesion,
+      organizacion: current.organizacion,
+      especialidadDocente: current.especialidadDocente,
+      createdAt: current.createdAt,
+      socialLinks: current.socialLinks,
+    );
+    notifyListeners();
+  }
+
 
   /// Cerrar sesion
   Future<void> logout() async {
@@ -138,4 +192,73 @@ class AuthNotifier extends Notifier<AuthState> implements ChangeNotifier {
 
   @override
   void dispose() => _listeners.clear();
+}
+
+// ── Catálogos (carreras / materias para registro docente) ─────────────────
+
+class CatalogState {
+  const CatalogState({
+    this.carreras = const [],
+    this.materias = const [],
+    this.isLoading = false,
+    this.error,
+  });
+
+  final List<Map<String, dynamic>> carreras;
+  final List<Map<String, dynamic>> materias;
+  final bool isLoading;
+  final String? error;
+
+  CatalogState copyWith({
+    List<Map<String, dynamic>>? carreras,
+    List<Map<String, dynamic>>? materias,
+    bool? isLoading,
+    String? error,
+  }) =>
+      CatalogState(
+        carreras: carreras ?? this.carreras,
+        materias: materias ?? this.materias,
+        isLoading: isLoading ?? this.isLoading,
+        error: error,
+      );
+}
+
+final catalogProvider =
+    NotifierProvider<CatalogNotifier, CatalogState>(CatalogNotifier.new);
+
+class CatalogNotifier extends Notifier<CatalogState> {
+  @override
+  CatalogState build() => const CatalogState();
+
+  AuthRemoteDatasource get _datasource =>
+      ref.read(authRemoteDatasourceProvider);
+
+  Future<void> loadCarreras() async {
+    if (state.carreras.isNotEmpty) return;
+    state = state.copyWith(isLoading: true);
+    try {
+      final list = await _datasource.loadCarreras();
+      state = state.copyWith(carreras: list, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> selectCarrera(String carreraId) async {
+    state = state.copyWith(materias: [], isLoading: true, error: null);
+    try {
+      final list = await _datasource.loadMaterias(carreraId);
+      state = state.copyWith(materias: list, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  void reset() => state = const CatalogState();
 }

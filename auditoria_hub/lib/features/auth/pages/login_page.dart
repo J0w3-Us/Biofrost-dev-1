@@ -30,7 +30,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _showWakeUp = false;
-  bool _showResetLink = false;
   bool _resetSent = false;
   String? _errorMsg;
   Timer? _wakeUpTimer;
@@ -57,12 +56,8 @@ class _LoginPageState extends ConsumerState<LoginPage>
     if (email == _lastEmail) return;
     _lastEmail = email;
     final newRole = email.isEmpty ? '' : RoleDetector.fromEmail(email);
-    final displayRole =
-        (newRole == 'Docente' || newRole == 'Invitado' || newRole == 'SuperAdmin')
-            ? newRole
-            : (email.isNotEmpty ? 'Invitado' : '');
-    if (displayRole != _detectedRole) {
-      setState(() => _detectedRole = displayRole);
+    if (newRole != _detectedRole) {
+      setState(() => _detectedRole = newRole);
     }
   }
 
@@ -83,9 +78,21 @@ class _LoginPageState extends ConsumerState<LoginPage>
       _isLoading = true;
       _errorMsg = null;
       _showWakeUp = false;
-      _showResetLink = false;
       _resetSent = false;
     });
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final showSheet = _detectedRole.isNotEmpty && _detectedRole != 'Invitado';
+    if (showSheet) {
+      showModalBottomSheet(
+        context: context,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _LoginRoleSheet(role: _detectedRole, isDark: isDark),
+      );
+    }
+
     _wakeUpTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && _isLoading) setState(() => _showWakeUp = true);
     });
@@ -98,8 +105,10 @@ class _LoginPageState extends ConsumerState<LoginPage>
         );
 
     _wakeUpTimer?.cancel();
-    final authState = ref.read(authStateProvider);
     if (!mounted) return;
+    if (showSheet) Navigator.of(context).pop();
+
+    final authState = ref.read(authStateProvider);
     setState(() {
       _isLoading = false;
       _showWakeUp = false;
@@ -111,50 +120,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
       } else {
         context.go('/showcase');
       }
-    } else if (authState is AuthError) {
-      final msg = authState.message;
-      final isCredError = msg.toLowerCase().contains('contraseña') ||
-          msg.toLowerCase().contains('incorrectos') ||
-          msg.toLowerCase().contains('credential') ||
-          msg.toLowerCase().contains('encontrada');
-      setState(() {
-        _errorMsg = msg;
-        _showResetLink = isCredError;
-      });
-    }
-  }
-
-  Future<void> _createAccount() async {
-    if (!_formKey.currentState!.validate()) return;
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _isLoading = true;
-      _errorMsg = null;
-      _showWakeUp = false;
-      _showResetLink = false;
-      _resetSent = false;
-    });
-    _wakeUpTimer = Timer(const Duration(seconds: 8), () {
-      if (mounted && _isLoading) setState(() => _showWakeUp = true);
-    });
-
-    await ref.read(authStateProvider.notifier).createAccount(
-          LoginCommand(
-            email: _emailCtrl.text.trim(),
-            password: _passCtrl.text,
-          ),
-        );
-
-    _wakeUpTimer?.cancel();
-    final authState = ref.read(authStateProvider);
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _showWakeUp = false;
-    });
-
-    if (authState is AuthAuthenticated) {
-      context.go('/register');
     } else if (authState is AuthError) {
       setState(() => _errorMsg = authState.message);
     }
@@ -200,8 +165,8 @@ class _LoginPageState extends ConsumerState<LoginPage>
       }
     } catch (e) {
       if (mounted) {
-        setState(
-            () => _errorMsg = 'No se pudo iniciar con Google. Intenta de nuevo.');
+        setState(() =>
+            _errorMsg = 'No se pudo iniciar con Google. Intenta de nuevo.');
       }
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
@@ -211,414 +176,280 @@ class _LoginPageState extends ConsumerState<LoginPage>
   Future<void> _sendPasswordReset() async {
     final email = _emailCtrl.text.trim();
     if (email.isEmpty || !email.contains('@')) {
-      setState(
-          () => _errorMsg = 'Ingresa tu correo antes de recuperar la contraseña.');
+      setState(() =>
+          _errorMsg = 'Ingresa tu correo antes de recuperar la contraseña.');
       return;
     }
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       setState(() {
         _resetSent = true;
-        _showResetLink = false;
         _errorMsg = null;
       });
     } catch (_) {
-      setState(() => _errorMsg = 'No se pudo enviar el correo de recuperación.');
+      setState(
+          () => _errorMsg = 'No se pudo enviar el correo de recuperación.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenH = MediaQuery.of(context).size.height;
-    final topPad = MediaQuery.of(context).padding.top;
 
-    // Colores adaptativos iOS
-    final bgTop = isDark
-        ? const Color(0xFF000000)
-        : const Color(0xFFF2F2F7);
-    final cardColor = isDark ? AppColors.darkSurface1 : Colors.white;
+    final bg = isDark ? AppColors.darkSurface0 : AppColors.lightBackground;
     final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
     final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
-    final mutedColor = isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final mutedColor =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
 
     return Scaffold(
-      backgroundColor: bgTop,
+      backgroundColor: bg,
+      resizeToAvoidBottomInset: true,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SafeArea(
-          top: false,
-          bottom: false,
           child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Header — Identidad de red social ─────────────────────
-                SizedBox(
-                  height: screenH * 0.30,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Fondo con gradiente sutil tipo iOS
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: isDark
-                                ? [
-                                    const Color(0xFF0A0A0A),
-                                    const Color(0xFF1C1C1E),
-                                  ]
-                                : [
-                                    const Color(0xFFE8F4FD),
-                                    const Color(0xFFF2F2F7),
-                                  ],
-                          ),
-                        ),
-                      ),
-                      // Orbe decorativo sutil
-                      Positioned(
-                        top: -40,
-                        right: -40,
-                        child: Container(
-                          width: 180,
-                          height: 180,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+
+                  // ── Brand ────────────────────────────────────────────
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                (isDark
-                                        ? AppColors.darkAccent
-                                        : AppColors.lightAccent)
-                                    .withOpacity(isDark ? 0.08 : 0.12),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        left: -30,
-                        child: Container(
-                          width: 130,
-                          height: 130,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                (isDark
-                                        ? AppColors.darkAccent
-                                        : AppColors.lightAccent)
-                                    .withOpacity(isDark ? 0.05 : 0.08),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Contenido centrado
-                      Padding(
-                        padding: EdgeInsets.only(top: topPad),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // App icon — squircle style
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.darkSurface2
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (isDark
-                                              ? AppColors.darkAccent
-                                              : AppColors.lightAccent)
-                                          .withOpacity(0.15),
-                                      blurRadius: 24,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                    if (!isDark)
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.hub_rounded,
-                                  size: 32,
-                                  color: isDark
-                                      ? AppColors.darkAccent
-                                      : AppColors.lightAccent,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Biofrost',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                  color: textPrimary,
-                                  letterSpacing: -1.0,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Universidad Tecnológica Metropolitana',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  color: mutedColor,
-                                  letterSpacing: 0,
-                                ),
+                            color:
+                                isDark ? AppColors.darkSurface2 : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.darkAccent.withOpacity(0.18),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
                               ),
                             ],
+                          ),
+                          child: Icon(
+                            Icons.hub_rounded,
+                            size: 24,
+                            color: isDark
+                                ? AppColors.darkAccent
+                                : AppColors.lightAccent,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Biofrost',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                            letterSpacing: -0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Universidad Tecnológica Metropolitana',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: mutedColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── Correo ───────────────────────────────────────────
+                  FormLabel('Correo electrónico', isDark: isDark),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    style: TextStyle(
+                        fontFamily: 'Inter', fontSize: 15, color: textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'correo@institucion.edu',
+                      prefixIcon: Icon(Icons.email_outlined,
+                          size: 18, color: mutedColor),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Ingresa tu correo';
+                      if (!v.contains('@')) return 'Correo inválido';
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Contraseña ───────────────────────────────────────
+                  FormLabel('Contraseña', isDark: isDark),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passCtrl,
+                    obscureText: _obscurePass,
+                    textInputAction: TextInputAction.done,
+                    style: TextStyle(
+                        fontFamily: 'Inter', fontSize: 15, color: textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Tu contraseña',
+                      prefixIcon: Icon(Icons.lock_outline_rounded,
+                          size: 18, color: mutedColor),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePass
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 18,
+                          color: mutedColor,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePass = !_obscurePass),
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty)
+                        return 'Ingresa tu contraseña';
+                      if (v.length < 6) return 'Mínimo 6 caracteres';
+                      return null;
+                    },
+                    onFieldSubmitted: (_) => _submitLogin(),
+                  ),
+
+                  // ── ¿Olvidaste tu contraseña? ────────────────────────
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _sendPasswordReset,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 6),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        '¿Olvidaste tu contraseña?',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.darkAccent
+                              : AppColors.lightAccent,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ── Mensajes ─────────────────────────────────────────
+                  if (_errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    _AlertBanner(
+                      color: AppColors.error,
+                      icon: Icons.error_outline_rounded,
+                      message: _errorMsg!,
+                    ),
+                  ],
+                  if (_resetSent) ...[
+                    const SizedBox(height: 8),
+                    _AlertBanner(
+                      color: AppColors.success,
+                      icon: Icons.check_circle_outline_rounded,
+                      message:
+                          'Correo de recuperación enviado. Revisa tu bandeja.',
+                    ),
+                  ],
+                  if (_showWakeUp) ...[
+                    const SizedBox(height: 8),
+                    _AlertBanner(
+                      color: AppColors.warning,
+                      icon: Icons.hourglass_top_rounded,
+                      message:
+                          'Servidor despertando… Esto solo ocurre en la primera conexión del día.',
+                      showSpinner: true,
+                    ),
+                  ],
+
+                  const SizedBox(height: 28),
+
+                  // ── Iniciar Sesión ───────────────────────────────────
+                  _ApplePrimaryButton(
+                    label: 'Iniciar Sesión',
+                    isLoading: _isLoading,
+                    onPressed:
+                        _isLoading || _isGoogleLoading ? null : _submitLogin,
+                    bgColor: primaryBtn,
+                    fgColor: primaryBtnText,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Divisor ──────────────────────────────────────────
+                  _LightDivider(isDark: isDark),
+
+                  const SizedBox(height: 20),
+
+                  // ── Continuar con Google ─────────────────────────────
+                  _GoogleButton(
+                    isLoading: _isGoogleLoading,
+                    onPressed: _isLoading || _isGoogleLoading
+                        ? null
+                        : _signInWithGoogle,
+                    isDark: isDark,
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── ¿No tienes cuenta? ───────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '¿No tienes cuenta?',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          color: mutedColor,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : () => context.push('/create-account'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Crear una nueva',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.darkAccent
+                                : AppColors.lightAccent,
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
 
-                // ── Formulario — Card elevada ──────────────────────────────
-                ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: screenH * 0.70),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppRadius.xxl)),
-                      boxShadow: [
-                        if (!isDark)
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04), // Lighter, more diffuse shadow
-                            blurRadius: 40,
-                            offset: const Offset(0, -10),
-                          ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.fromLTRB(32, 40, 32, 48), // Wider padding for breathing room
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // ── Indicador de arrastre ─────────────────────
-                          Center(
-                            child: Container(
-                              width: 36,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.full),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-
-                          // Título
-                          Text(
-                            'Iniciar sesión',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: textPrimary,
-                              letterSpacing: -0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Accede a tu cuenta de auditoría',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: mutedColor,
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-
-                          // ── Correo ──────────────────────────────────────
-                          FormLabel('Correo electrónico', isDark: isDark),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 15,
-                              color: textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'correo@institucion.edu',
-                              prefixIcon:
-                                  Icon(Icons.email_outlined, size: 18, color: mutedColor),
-                            ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty) return 'Ingresa tu correo';
-                              if (!v.contains('@')) return 'Correo inválido';
-                              return null;
-                            },
-                          ),
-
-                          // ── Badge de rol detectado ─────────────────────
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            child: _detectedRole.isNotEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 10),
-                                    child: _RoleBadge(
-                                      role: _detectedRole,
-                                      isDark: isDark,
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // ── Contraseña ──────────────────────────────────
-                          FormLabel('Contraseña', isDark: isDark),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _passCtrl,
-                            obscureText: _obscurePass,
-                            textInputAction: TextInputAction.done,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 15,
-                              color: textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Tu contraseña',
-                              prefixIcon: Icon(Icons.lock_outline_rounded,
-                                  size: 18, color: mutedColor),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePass
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
-                                  color: mutedColor,
-                                ),
-                                onPressed: () =>
-                                    setState(() => _obscurePass = !_obscurePass),
-                              ),
-                            ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty)
-                                return 'Ingresa tu contraseña';
-                              if (v.length < 6) return 'Mínimo 6 caracteres';
-                              return null;
-                            },
-                            onFieldSubmitted: (_) => _submitLogin(),
-                          ),
-
-                          // ── Mensajes ────────────────────────────────────
-                          if (_errorMsg != null) ...[
-                            const SizedBox(height: 16),
-                            _AlertBanner(
-                              color: AppColors.error,
-                              icon: Icons.error_outline_rounded,
-                              message: _errorMsg!,
-                            ),
-                            if (_showResetLink) ...[
-                              const SizedBox(height: 4),
-                              TextButton(
-                                onPressed: _sendPasswordReset,
-                                child: Text(
-                                  '¿Olvidaste tu contraseña? Recupérala aquí',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    color: AppColors.lightAccent,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                          if (_resetSent) ...[
-                            const SizedBox(height: 16),
-                            _AlertBanner(
-                              color: AppColors.success,
-                              icon: Icons.check_circle_outline_rounded,
-                              message:
-                                  'Correo de recuperación enviado. Revisa tu bandeja.',
-                            ),
-                          ],
-                          if (_showWakeUp) ...[
-                            const SizedBox(height: 12),
-                            _AlertBanner(
-                              color: AppColors.warning,
-                              icon: Icons.hourglass_top_rounded,
-                              message:
-                                  'Servidor despertando… Esto solo ocurre en la primera conexión del día.',
-                              showSpinner: true,
-                            ),
-                          ],
-
-                          const SizedBox(height: 28),
-
-                          // ── CTA Principal — Iniciar Sesión ─────────────
-                          _ApplePrimaryButton(
-                            label: 'Iniciar Sesión',
-                            isLoading: _isLoading,
-                            onPressed: _isLoading || _isGoogleLoading
-                                ? null
-                                : _submitLogin,
-                            bgColor: primaryBtn,
-                            fgColor: primaryBtnText,
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // ── Secundario — Crear Cuenta ──────────────────
-                          _AppleOutlineButton(
-                            label: 'Crear cuenta nueva',
-                            isLoading: _isLoading,
-                            onPressed: _isLoading || _isGoogleLoading
-                                ? null
-                                : _createAccount,
-                            isDark: isDark,
-                          ),
-
-                          // ── Divisor ─────────────────────────────────────
-                          const SizedBox(height: 24),
-                          _LightDivider(isDark: isDark),
-                          const SizedBox(height: 20),
-
-                          // ── Google Button ───────────────────────────────
-                          _GoogleButton(
-                            isLoading: _isGoogleLoading,
-                            onPressed: _isLoading || _isGoogleLoading
-                                ? null
-                                : _signInWithGoogle,
-                            isDark: isDark,
-                          ),
-
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         ),
@@ -627,98 +458,87 @@ class _LoginPageState extends ConsumerState<LoginPage>
   }
 }
 
-// ── Badge de rol ──────────────────────────────────────────────────────────────
+// ── Login Role Sheet — confirmación post-submit ──────────────────────────────
 
-class _RoleBadge extends StatelessWidget {
-  const _RoleBadge({required this.role, required this.isDark});
+class _LoginRoleSheet extends StatelessWidget {
+  const _LoginRoleSheet({required this.role, required this.isDark});
   final String role;
   final bool isDark;
 
-  Color get _bgColor => switch (role) {
-        'Docente' => isDark
-            ? const Color(0xFF0A2F1A)
-            : const Color(0xFFE6F9ED),
-        'SuperAdmin' => isDark
-            ? const Color(0xFF1A0F00)
-            : const Color(0xFFFFF3E0),
-        _ => isDark
-            ? const Color(0xFF001A3D)
-            : const Color(0xFFE8F4FD),
-      };
-
-  Color get _fgColor => switch (role) {
-        'Docente' => isDark ? const Color(0xFF30D158) : const Color(0xFF1A7A35),
-        'SuperAdmin' =>
-          isDark ? const Color(0xFFFF9F0A) : const Color(0xFFB06000),
-        _ => isDark ? const Color(0xFF0A84FF) : const Color(0xFF0062CC),
-      };
-
   IconData get _icon => switch (role) {
+        'Alumno' => Icons.school_rounded,
         'Docente' => Icons.school_rounded,
         'SuperAdmin' => Icons.admin_panel_settings_rounded,
         _ => Icons.person_outline_rounded,
       };
 
   String get _label => switch (role) {
-        'Docente' => 'Docente UTM — acceso al panel de enseñanza',
-        'SuperAdmin' => 'Administrador — acceso total al sistema',
-        _ => 'Invitado — acceso externo con permisos limitados',
-      };
-
-  String get _roleTag => switch (role) {
-        'Docente' => 'Docente',
-        'SuperAdmin' => 'Super Admin',
-        _ => 'Invitado',
+        'Alumno' => 'Entrando como Alumno UTM',
+        'Docente' => 'Entrando como Docente UTM',
+        'SuperAdmin' => 'Acceso de Administrador',
+        _ => 'Iniciando sesión',
       };
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: _bgColor,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: _fgColor.withOpacity(0.25), width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: _fgColor.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(_icon, size: 14, color: _fgColor),
+    final accent = isDark ? AppColors.darkAccent : AppColors.lightAccent;
+    final surface = isDark ? AppColors.darkSurface1 : Colors.white;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: Border.all(color: accent.withOpacity(0.2)),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Rol detectado: $_roleTag',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _fgColor,
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 1),
-                Text(
-                  _label,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    color: _fgColor.withOpacity(0.7),
-                  ),
+                child: Icon(_icon, size: 26, color: accent),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: textPrimary,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Verificando credenciales...',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              LinearProgressIndicator(
+                backgroundColor: accent.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -776,58 +596,6 @@ class _ApplePrimaryButton extends StatelessWidget {
   }
 }
 
-// ── Botón Outline Apple ───────────────────────────────────────────────────────
-
-class _AppleOutlineButton extends StatelessWidget {
-  const _AppleOutlineButton({
-    required this.label,
-    required this.isDark,
-    this.onPressed,
-    this.isLoading = false,
-  });
-  final String label;
-  final bool isDark;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
-    final border =
-        isDark ? AppColors.darkBorder : const Color(0xFFD1D1D6);
-
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: border, width: 1.0),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.full)),
-          backgroundColor:
-              isDark ? AppColors.darkSurface2.withOpacity(0.5) : Colors.transparent,
-        ),
-        onPressed: isLoading ? null : onPressed,
-        child: isLoading
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: text),
-              )
-            : Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: text,
-                  letterSpacing: -0.2,
-                ),
-              ),
-      ),
-    );
-  }
-}
-
 // ── Divisor ligero ───────────────────────────────────────────────────────────
 
 class _LightDivider extends StatelessWidget {
@@ -836,8 +604,7 @@ class _LightDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lineColor =
-        isDark ? AppColors.darkBorder : const Color(0xFFE5E5EA);
+    final lineColor = isDark ? AppColors.darkBorder : const Color(0xFFE5E5EA);
     final textColor =
         isDark ? AppColors.darkTextDisabled : AppColors.lightMutedFg;
 
@@ -875,8 +642,7 @@ class _GoogleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor =
-        isDark ? AppColors.darkBorder : const Color(0xFFE5E5EA);
+    final borderColor = isDark ? AppColors.darkBorder : const Color(0xFFE5E5EA);
     final bgColor = isDark ? AppColors.darkSurface2 : Colors.white;
     final textColor =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
@@ -961,8 +727,7 @@ class _AlertBanner extends StatelessWidget {
             SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: color),
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
             )
           else
             Icon(icon, size: 16, color: color),

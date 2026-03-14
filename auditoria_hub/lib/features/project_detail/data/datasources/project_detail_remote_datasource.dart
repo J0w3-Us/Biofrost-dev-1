@@ -62,14 +62,24 @@ class ProjectDetailRemoteDatasource {
   /// RF-04: Envía evaluación al backend — requiere conexión.
   ///
   /// Body esperado por POST /api/evaluations:
-  /// { projectId, docenteId, docenteNombre, tipo, contenido, calificacion? }
+  /// {
+  ///   projectId,
+  ///   docenteId,
+  ///   docenteNombre,
+  ///   tipo,
+  ///   status,
+  ///   weightedTotalScore,
+  ///   criteria,
+  ///   calificacion
+  /// }
   Future<void> submitEvaluation({
     required String projectId,
     required String docenteId,
     required String docenteNombre,
     required String tipo,
-    required int stars,
-    String? feedback,
+    required String status,
+    required double weightedTotalScore,
+    required List<Map<String, dynamic>> criteria,
   }) async {
     try {
       await _dio.post(
@@ -79,9 +89,12 @@ class ProjectDetailRemoteDatasource {
           'docenteId': docenteId,
           'docenteNombre': docenteNombre,
           'tipo': tipo,
-          'contenido': feedback ?? '',
-          // oficial: calificacion en escala 0-100 (stars * 20)
-          if (tipo == 'oficial') 'calificacion': (stars * 20).clamp(0, 100),
+          'status': status,
+          'weightedTotalScore': weightedTotalScore,
+          'criteria': criteria,
+          // Compatibilidad API legado en escala 0-100.
+          if (tipo == 'oficial')
+            'calificacion': weightedTotalScore.round().clamp(0, 100),
         },
       );
     } on DioException catch (e) {

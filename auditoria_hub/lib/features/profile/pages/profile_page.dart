@@ -1,15 +1,24 @@
-// features/profile/pages/profile_page.dart — Pantalla de perfil (Biofrost)
+﻿// features/profile/pages/profile_page.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// Perfil — minimalista, iOS-nativo, edición in-line, redes estilo shadcn/ui
+// ─────────────────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/ui_kit.dart';
 import '../../../core/providers/theme_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/profile_remote_datasource.dart';
+import '../domain/social_type.dart';
+import '../widgets/account_settings_card.dart';
+import '../widgets/identity_section.dart';
+import '../widgets/social_links_group.dart';
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -28,133 +37,78 @@ class ProfilePage extends ConsumerWidget {
     }
 
     return Scaffold(
+      // ── Top bar sin título prominente — estilo páginas de ajustes iOS ──────
       appBar: AppBar(
-        title: const Text('Mi Perfil'),
         automaticallyImplyLeading: false,
+        // Título muy discreto — la identidad del usuario aporta el contexto
+        title: Text(
+          'Perfil',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
+            color:
+                isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+          ),
+        ),
+        actions: [
+          // ── Toggle tema — discreto, sin tooltip verboso ──────────────
+          _ThemeToggleButton(isDark: isDark, themeMode: themeMode, ref: ref),
+          const SizedBox(width: 8),
+        ],
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sp40),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sp48),
         children: [
-          // ── Header ──────────────────────────────────────────────────
-          _ProfileHeader(
+          // ── Identidad (avatar + nombre editable + email) ─────────────────
+          IdentitySection(
             auth: auth,
             isDark: isDark,
             onPickPhoto: () => _pickAndUploadPhoto(context, ref, auth),
+            onSaveName: (name) => _saveName(context, ref, auth, name),
           ),
+
+          const SizedBox(height: AppSpacing.sp28),
+
+          // ── Redes Sociales — lista shadcn-style ──────────────────────────
+          _SectionLabel(label: 'Redes sociales', isDark: isDark),
+          const SizedBox(height: AppSpacing.sp8),
+          SocialLinksGroup(
+            socialLinks: auth.socialLinks ?? const {},
+            isDark: isDark,
+            onEditRequested: (type) => _openSocialSheet(
+              context,
+              ref,
+              auth,
+              isDark,
+              focused: type,
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.sp28),
+
+          _SectionLabel(label: 'Configuración de cuenta', isDark: isDark),
+          const SizedBox(height: AppSpacing.sp8),
+          AccountSettingsCard(
+            isDark: isDark,
+            onAccountDeleted: () => context.go('/login'),
+          ),
+
+          const SizedBox(height: AppSpacing.sp28),
+
+          // ── Cerrar sesión — acción destructiva sutil ──────────────────────
+          _SignOutButton(onPressed: () => _confirmLogout(context, ref)),
 
           const SizedBox(height: AppSpacing.sp20),
 
-          // ── KPIs ─────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: _KpiRow(isDark: isDark),
-          ),
-
-          const SizedBox(height: AppSpacing.sp24),
-
-          // ── Configuración ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: Text(
-              'Configuración',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightForeground,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sp8),
-
-          // Toggle tema
-          _SettingsTile(
-            isDark: isDark,
-            icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-            title: 'Tema oscuro',
-            trailing: Switch(
-              value: themeMode == ThemeMode.dark,
-              onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
-              activeThumbColor:
-                  isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
-            ),
-          ),
-
-          _SettingsTile(
-            isDark: isDark,
-            icon: Icons.edit_outlined,
-            title: 'Editar perfil',
-            showArrow: true,
-            onTap: () => _showEditProfileSheet(context, ref, auth, isDark),
-          ),
-
-          const SizedBox(height: AppSpacing.sp24),
-
-          // ── Información profesional ────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: Text(
-              'Información profesional',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightForeground,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sp12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: BioCard(
-              child: Column(
-                children: [
-                  _InfoRow(
-                    icon: Icons.badge_outlined,
-                    label: 'Rol',
-                    value: _capitalize(auth.role),
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: AppSpacing.sp12),
-                  _InfoRow(
-                    icon: Icons.email_outlined,
-                    label: 'Correo',
-                    value: auth.email,
-                    isDark: isDark,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sp32),
-
-          // ── Cerrar sesión ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: BioButton(
-              label: 'Cerrar sesión',
-              variant: BioButtonVariant.secondary,
-              icon: Icons.logout_rounded,
-              onPressed: () => _confirmLogout(context, ref),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sp16),
-
-          // Footer
           Center(
             child: Text(
-              'Auditoría Hub v1.0.0 • IntegradorHub',
+              'Auditoría Hub v1.0.0 · IntegradorHub',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 10,
+                letterSpacing: 0.1,
                 color: isDark
                     ? AppColors.darkTextDisabled
                     : AppColors.lightMutedFg,
@@ -165,6 +119,8 @@ class ProfilePage extends ConsumerWidget {
       ),
     );
   }
+
+  // ── Acciones ────────────────────────────────────────────────────────────────
 
   Future<void> _pickAndUploadPhoto(
       BuildContext context, WidgetRef ref, AuthAuthenticated auth) async {
@@ -192,22 +148,31 @@ class ProfilePage extends ConsumerWidget {
     }
   }
 
-  void _showEditProfileSheet(BuildContext context, WidgetRef ref,
-      AuthAuthenticated auth, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _EditProfileSheet(auth: auth, isDark: isDark, ref: ref),
-    );
-  }
-
-  String _capitalize(String s) {
-    if (s.isEmpty) return s;
-    return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  Future<void> _saveName(BuildContext context, WidgetRef ref,
+      AuthAuthenticated auth, String name) async {
+    if (name.trim().isEmpty || name.trim() == auth.displayName) return;
+    final ds = ref.read(profileRemoteDatasourceProvider);
+    try {
+      await ds.updateDisplayName(auth.uid, name.trim());
+      ref
+          .read(authStateProvider.notifier)
+          .updateDisplayNameInState(name.trim());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nombre actualizado')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al actualizar el nombre')),
+        );
+      }
+    }
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -220,7 +185,7 @@ class ProfilePage extends ConsumerWidget {
               'Cancelar',
               style: TextStyle(
                 fontFamily: 'Inter',
-                color: Theme.of(ctx).brightness == Brightness.dark
+                color: isDark
                     ? AppColors.darkTextSecondary
                     : AppColors.lightMutedFg,
               ),
@@ -248,364 +213,226 @@ class ProfilePage extends ConsumerWidget {
   }
 }
 
-// ── Profile Header ──────────────────────────────────────────────────────────
+// ── Theme Toggle Button ───────────────────────────────────────────────────────
+// Icono discreto sin fondo ni borde — un solo trazo limpio
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.auth,
+class _ThemeToggleButton extends StatelessWidget {
+  const _ThemeToggleButton({
     required this.isDark,
-    required this.onPickPhoto,
-  });
-  final AuthAuthenticated auth;
-  final bool isDark;
-  final VoidCallback onPickPhoto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [AppColors.darkSurface1, AppColors.darkSurface0]
-              : [AppColors.lightCard, AppColors.lightMuted],
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sp16, vertical: AppSpacing.sp24),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: onPickPhoto,
-            child: Stack(
-              children: [
-                UserAvatar(
-                  name: auth.displayName,
-                  imageUrl: auth.photoUrl,
-                  size: 72,
-                  showBorder: true,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkPrimary
-                          : AppColors.lightPrimary,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.darkSurface0
-                            : AppColors.lightBackground,
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      size: 12,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sp16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  auth.displayName,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightForeground,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  auth.isTeacher ? 'Docente' : 'Visitante',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightMutedFg,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  auth.email,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.darkTextDisabled
-                        : AppColors.lightMutedFg,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── KPI Row ─────────────────────────────────────────────────────────────────
-
-class _KpiRow extends StatelessWidget {
-  const _KpiRow({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _KpiCard(value: '—', label: 'Proyectos', isDark: isDark),
-        const SizedBox(width: AppSpacing.sp8),
-        _KpiCard(value: '—', label: 'Evaluaciones', isDark: isDark),
-        const SizedBox(width: AppSpacing.sp8),
-        _KpiCard(value: '—', label: 'Promedio', isDark: isDark),
-      ],
-    );
-  }
-}
-
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.value,
-    required this.label,
-    required this.isDark,
-  });
-  final String value;
-  final String label;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.sp12, horizontal: AppSpacing.sp8),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface2 : AppColors.lightMuted,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightForeground,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Settings Tile ────────────────────────────────────────────────────────────
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.isDark,
-    required this.icon,
-    required this.title,
-    this.trailing,
-    this.showArrow = false,
-    this.onTap,
-  });
-
-  final bool isDark;
-  final IconData icon;
-  final String title;
-  final Widget? trailing;
-  final bool showArrow;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sp16, vertical: AppSpacing.sp12),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color:
-                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
-            ),
-            const SizedBox(width: AppSpacing.sp12),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 15,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightForeground,
-                ),
-              ),
-            ),
-            if (trailing != null) trailing!,
-            if (showArrow)
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Info Row ─────────────────────────────────────────────────────────────────
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
-        ),
-        const SizedBox(width: AppSpacing.sp8),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
-            color: isDark ? AppColors.darkTextDisabled : AppColors.lightMutedFg,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightForeground,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Edit Profile Bottom Sheet ─────────────────────────────────────────────────
-
-class _EditProfileSheet extends StatefulWidget {
-  const _EditProfileSheet({
-    required this.auth,
-    required this.isDark,
+    required this.themeMode,
     required this.ref,
   });
-  final AuthAuthenticated auth;
+
   final bool isDark;
+  final ThemeMode themeMode;
   final WidgetRef ref;
 
   @override
-  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+  Widget build(BuildContext context) {
+    final icon = themeMode == ThemeMode.dark
+        ? Icons.light_mode_rounded
+        : Icons.dark_mode_outlined;
+    final color = isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        ref.read(themeProvider.notifier).toggle();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: animation,
+            child: FadeTransition(opacity: animation, child: child),
+          ),
+          child: Icon(icon, key: ValueKey(themeMode), size: 22, color: color),
+        ),
+      ),
+    );
+  }
 }
 
-class _EditProfileSheetState extends State<_EditProfileSheet> {
-  late final TextEditingController _linkedinCtrl;
-  late final TextEditingController _githubCtrl;
-  late final TextEditingController _websiteCtrl;
+// ── Section Label ─────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label, required this.isDark});
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp20),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sign Out Button ───────────────────────────────────────────────────────────
+// Acción destructiva sutil: texto rojo sin borde, sin fondo pesado.
+// Diseño inspirado en iOS Settings "Sign Out" row.
+
+class _SignOutButton extends StatefulWidget {
+  const _SignOutButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  State<_SignOutButton> createState() => _SignOutButtonState();
+}
+
+class _SignOutButtonState extends State<_SignOutButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onPressed();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.sp16, horizontal: AppSpacing.sp20),
+          decoration: BoxDecoration(
+            color:
+                _pressed ? AppColors.error.withAlpha(10) : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: AppColors.error.withAlpha(_pressed ? 60 : 40),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                size: 18,
+                color: AppColors.error.withAlpha(_pressed ? 220 : 180),
+              ),
+              const SizedBox(width: AppSpacing.sp8),
+              Text(
+                'Cerrar sesión',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.error.withAlpha(_pressed ? 220 : 180),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Edit Social Sheet ─────────────────────────────────────────────────────────
+// Bottom sheet de edición (abierto desde _SocialLinksGroup cuando vacío
+// o con long-press cuando ya tiene un link guardado)
+
+void _openSocialSheet(
+  BuildContext context,
+  WidgetRef ref,
+  AuthAuthenticated auth,
+  bool isDark, {
+  required SocialType? focused,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _EditSocialSheet(
+      auth: auth,
+      isDark: isDark,
+      ref: ref,
+      focused: focused,
+    ),
+  );
+}
+
+class _EditSocialSheet extends StatefulWidget {
+  const _EditSocialSheet({
+    required this.auth,
+    required this.isDark,
+    required this.ref,
+    this.focused,
+  });
+
+  final AuthAuthenticated auth;
+  final bool isDark;
+  final WidgetRef ref;
+  final SocialType? focused;
+
+  @override
+  State<_EditSocialSheet> createState() => _EditSocialSheetState();
+}
+
+class _EditSocialSheetState extends State<_EditSocialSheet> {
+  late final Map<SocialType, TextEditingController> _ctrls;
+  late final Map<SocialType, FocusNode> _focusNodes;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _linkedinCtrl = TextEditingController();
-    _githubCtrl = TextEditingController();
-    _websiteCtrl = TextEditingController();
+    _ctrls = {
+      for (final t in SocialType.values)
+        t: TextEditingController(text: widget.auth.socialLinks?[t.name] ?? ''),
+    };
+    _focusNodes = {
+      for (final t in SocialType.values) t: FocusNode(),
+    };
+
+    if (widget.focused != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusNodes[widget.focused!]?.requestFocus();
+      });
+    }
   }
 
   @override
   void dispose() {
-    _linkedinCtrl.dispose();
-    _githubCtrl.dispose();
-    _websiteCtrl.dispose();
+    for (final c in _ctrls.values) c.dispose();
+    for (final f in _focusNodes.values) f.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    final links = <String, String>{};
-    if (_linkedinCtrl.text.trim().isNotEmpty) {
-      links['linkedin'] = _linkedinCtrl.text.trim();
-    }
-    if (_githubCtrl.text.trim().isNotEmpty) {
-      links['github'] = _githubCtrl.text.trim();
-    }
-    if (_websiteCtrl.text.trim().isNotEmpty) {
-      links['website'] = _websiteCtrl.text.trim();
-    }
+    final links = <String, String>{
+      for (final entry in _ctrls.entries)
+        if (entry.value.text.trim().isNotEmpty)
+          entry.key.name: entry.value.text.trim(),
+    };
 
     setState(() => _saving = true);
     try {
       final ds = widget.ref.read(profileRemoteDatasourceProvider);
       await ds.updateSocial(widget.auth.uid, links);
+      widget.ref
+          .read(authStateProvider.notifier)
+          .updateSocialLinksInState(links);
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil actualizado')),
+          const SnackBar(content: Text('Redes sociales actualizadas')),
         );
       }
     } catch (_) {
@@ -622,17 +449,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textMuted =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface1 : Colors.white,
+        color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
         borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadius.lg),
+          top: Radius.circular(AppRadius.xl),
         ),
       ),
       padding: EdgeInsets.only(
-        left: AppSpacing.sp16,
-        right: AppSpacing.sp16,
+        left: AppSpacing.sp20,
+        right: AppSpacing.sp20,
         top: AppSpacing.sp16,
         bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.sp32,
       ),
@@ -651,57 +482,54 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sp16),
+          const SizedBox(height: AppSpacing.sp20),
           Text(
-            'Editar perfil',
+            'Redes sociales',
             style: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightForeground,
+              letterSpacing: -0.4,
+              color: textPrimary,
             ),
           ),
-          const SizedBox(height: AppSpacing.sp8),
+          const SizedBox(height: AppSpacing.sp4),
           Text(
-            'Actualiza tus redes sociales para que aparezcan en tu perfil público.',
+            'Agrega tus links para que aparezcan en tu perfil.',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 13,
-              color:
-                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+              color: textMuted,
             ),
           ),
-          const SizedBox(height: AppSpacing.sp20),
-          _SocialField(
-            controller: _linkedinCtrl,
-            label: 'LinkedIn',
-            hint: 'https://linkedin.com/in/usuario',
-            icon: Icons.link_rounded,
-            isDark: isDark,
-          ),
-          const SizedBox(height: AppSpacing.sp12),
-          _SocialField(
-            controller: _githubCtrl,
-            label: 'GitHub',
-            hint: 'https://github.com/usuario',
-            icon: Icons.code_rounded,
-            isDark: isDark,
-          ),
-          const SizedBox(height: AppSpacing.sp12),
-          _SocialField(
-            controller: _websiteCtrl,
-            label: 'Sitio web',
-            hint: 'https://mi-sitio.com',
-            icon: Icons.language_rounded,
-            isDark: isDark,
-          ),
           const SizedBox(height: AppSpacing.sp24),
-          BioButton(
-            label: 'Guardar cambios',
-            onPressed: _saving ? null : _save,
-            isLoading: _saving,
+
+          ...SocialType.values.map((type) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sp16),
+                child: _SocialField(
+                  controller: _ctrls[type]!,
+                  focusNode: _focusNodes[type]!,
+                  label: type.label,
+                  hint: type.hint,
+                  icon: type.icon,
+                  isDark: isDark,
+                ),
+              )),
+
+          const SizedBox(height: AppSpacing.sp12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Guardar cambios'),
+            ),
           ),
         ],
       ),
@@ -709,9 +537,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 }
 
+// ── Social Field ──────────────────────────────────────────────────────────────
+
 class _SocialField extends StatelessWidget {
   const _SocialField({
     required this.controller,
+    required this.focusNode,
     required this.label,
     required this.hint,
     required this.icon,
@@ -719,6 +550,7 @@ class _SocialField extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final String label;
   final String hint;
   final IconData icon;
@@ -726,6 +558,11 @@ class _SocialField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textMuted =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -735,42 +572,41 @@ class _SocialField extends StatelessWidget {
             fontFamily: 'Inter',
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color:
-                isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+            color: textMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.sp6),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: TextInputType.url,
           autocorrect: false,
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 14,
-            color:
-                isDark ? AppColors.darkTextPrimary : AppColors.lightForeground,
+            color: textPrimary,
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon,
-                size: 18,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg),
+            prefixIcon: Icon(icon, size: 18, color: textMuted),
             hintText: hint,
-            hintStyle: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color:
-                  isDark ? AppColors.darkTextDisabled : AppColors.lightMutedFg,
-            ),
             filled: true,
-            fillColor: isDark ? AppColors.darkSurface2 : AppColors.lightMuted,
+            fillColor:
+                isDark ? AppColors.darkSurface2 : AppColors.lightBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide.none,
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide:
+                  const BorderSide(color: AppColors.lightPrimary, width: 1.5),
+            ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sp12, vertical: AppSpacing.sp12),
+                horizontal: AppSpacing.sp12, vertical: AppSpacing.sp13),
           ),
         ),
       ],

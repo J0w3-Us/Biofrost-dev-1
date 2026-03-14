@@ -29,7 +29,9 @@ class AuthRemoteDatasource {
       if (cmd.isGoogleSignIn) {
         // Google ya autenticó antes del llamado; usamos el usuario activo.
         final current = _firebaseAuth.currentUser;
-        if (current == null) throw const ValidationException('No se pudo iniciar sesión con Google.');
+        if (current == null)
+          throw const ValidationException(
+              'No se pudo iniciar sesión con Google.');
         firebaseUser = current;
       } else {
         // Email + password: SOLO intenta sign-in.
@@ -51,7 +53,8 @@ class AuthRemoteDatasource {
             data: {
               'firebaseUid': firebaseUser.uid,
               'email': firebaseUser.email,
-              'displayName': firebaseUser.displayName ?? cmd.email.split('@')[0],
+              'displayName':
+                  firebaseUser.displayName ?? cmd.email.split('@')[0],
               'photoUrl': firebaseUser.photoURL,
             },
           ));
@@ -85,7 +88,8 @@ class AuthRemoteDatasource {
             data: {
               'firebaseUid': firebaseUser!.uid,
               'email': firebaseUser.email,
-              'displayName': firebaseUser.displayName ?? cmd.email.split('@')[0],
+              'displayName':
+                  firebaseUser.displayName ?? cmd.email.split('@')[0],
               'photoUrl': firebaseUser.photoURL,
             },
           ));
@@ -198,7 +202,6 @@ class AuthRemoteDatasource {
       // 4. Login automático tras registro exitoso
       return await login(
           LoginCommand(email: cmd.email, password: cmd.password));
-
     } on FirebaseAuthException catch (e) {
       _logger.w('Firebase register error: ${e.code}');
       // Cuenta ya existe en Firebase — puede ser un huérfano de intento previo
@@ -284,12 +287,36 @@ class AuthRemoteDatasource {
           ));
 
       return _mapResponse(loginRes.data as Map<String, dynamic>);
-
     } on DioException catch (e) {
       _logger.e(
         'Backend completeProfile error [${e.response?.statusCode}]',
         error: e.response?.data ?? e.message,
       );
+      throw handleDioError(e);
+    }
+  }
+
+  // ── Catálogos ─────────────────────────────────────────────────────────────
+
+  /// Obtiene todas las carreras disponibles (para selector en registro docente).
+  Future<List<Map<String, dynamic>>> loadCarreras() async {
+    try {
+      final res = await _dio.get(ApiEndpoints.adminCarreras);
+      return (res.data as List).cast<Map<String, dynamic>>();
+    } on DioException catch (e) {
+      throw handleDioError(e);
+    }
+  }
+
+  /// Obtiene materias y grupos disponibles para una carrera dada.
+  Future<List<Map<String, dynamic>>> loadMaterias(String carreraId) async {
+    try {
+      final res = await _dio.get(
+        '${ApiEndpoints.adminMaterias}/available',
+        queryParameters: {'carreraId': carreraId},
+      );
+      return (res.data as List).cast<Map<String, dynamic>>();
+    } on DioException catch (e) {
       throw handleDioError(e);
     }
   }
@@ -302,7 +329,9 @@ class AuthRemoteDatasource {
       _logger.i('Rollback: usuario Firebase eliminado (${user.email})');
       await _removePendingRollback(user.uid);
     } catch (e) {
-      _logger.w('Rollback: no se pudo eliminar usuario Firebase, guardando para después', error: e);
+      _logger.w(
+          'Rollback: no se pudo eliminar usuario Firebase, guardando para después',
+          error: e);
       await _savePendingRollback(user.uid);
     }
   }
@@ -360,7 +389,8 @@ class AuthRemoteDatasource {
             e.type == DioExceptionType.connectionError ||
             e.type == DioExceptionType.receiveTimeout;
         if (isRetryable && attempt < maxAttempts) {
-          _logger.i('Reintento $attempt/$maxAttempts tras ${e.type} — esperando ${delay.inSeconds}s...');
+          _logger.i(
+              'Reintento $attempt/$maxAttempts tras ${e.type} — esperando ${delay.inSeconds}s...');
           await Future<void>.delayed(delay);
           continue;
         }
@@ -394,6 +424,17 @@ class AuthRemoteDatasource {
       organizacion: strN('organizacion', 'Organizacion'),
       especialidadDocente: strN('especialidadDocente', 'EspecialidadDocente'),
       createdAt: strN('createdAt', 'CreatedAt'),
+      socialLinks: _parseSocialLinks(d['redesSociales'] ?? d['RedesSociales']),
+    );
+  }
+
+  static Map<String, String>? _parseSocialLinks(dynamic raw) {
+    if (raw is! Map) return null;
+    return Map.fromEntries(
+      raw.entries
+          .where(
+              (e) => e.value is String && (e.value as String).trim().isNotEmpty)
+          .map((e) => MapEntry(e.key.toString(), (e.value as String).trim())),
     );
   }
 

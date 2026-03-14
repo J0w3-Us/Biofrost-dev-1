@@ -74,15 +74,16 @@ final filteredProjectsProvider = Provider<List<ProjectReadModel>>((ref) {
 
   var list = projects;
   final q = filters.search.toLowerCase();
-  
+
   if (q.isNotEmpty) {
-    list = list.where((p) => 
-      p.title.toLowerCase().contains(q) ||
-      p.description.toLowerCase().contains(q) ||
-      p.teamName.toLowerCase().contains(q) ||
-      p.techStack.any((t) => t.toLowerCase().contains(q)) ||
-      p.tags.any((t) => t.toLowerCase().contains(q))
-    ).toList();
+    list = list
+        .where((p) =>
+            p.title.toLowerCase().contains(q) ||
+            p.description.toLowerCase().contains(q) ||
+            p.teamName.toLowerCase().contains(q) ||
+            p.techStack.any((t) => t.toLowerCase().contains(q)) ||
+            p.tags.any((t) => t.toLowerCase().contains(q)))
+        .toList();
   }
 
   if (filters.category != null && filters.category!.isNotEmpty) {
@@ -104,16 +105,15 @@ class ShowcaseNotifier extends Notifier<ShowcaseState> {
   }
 
   ShowcaseRemoteDatasource get _ds => ref.read(showcaseDatasourceProvider);
-  ShowcaseFilters get _filters => ref.read(showcaseFiltersProvider);
 
   /// Carga inicial — siempre ejecuta sin guard
   Future<void> _loadInitial() async {
     state = const ShowcaseState(isLoading: true);
     try {
       final result = await _ds.getProjects(
-        // Los filtros ahora son locales para esta version p/ evitar llamadas innecesarias al API
-        // si el API es un array directo.
-      );
+          // Los filtros ahora son locales para esta version p/ evitar llamadas innecesarias al API
+          // si el API es un array directo.
+          );
       state = ShowcaseState(
         projects: result.items,
         hasMore: result.hasMore,

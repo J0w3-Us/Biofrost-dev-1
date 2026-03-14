@@ -125,8 +125,9 @@ class ProjectDetailNotifier extends FamilyNotifier<ProjectDetailState, String> {
         docenteNombre: auth.displayName,
         // Docentes → "oficial" (calificación 0-100); invitados → "sugerencia"
         tipo: auth.isTeacher ? 'oficial' : 'sugerencia',
-        stars: cmd.stars,
-        feedback: cmd.feedback,
+        status: cmd.status.name,
+        weightedTotalScore: cmd.weightedTotalScore,
+        criteria: cmd.criteria.map((c) => c.toMap()).toList(),
       );
       // Recarga el detalle con uid para resolver myEvaluation
       final updated = await _ds.getProjectDetail(

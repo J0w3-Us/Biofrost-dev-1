@@ -1,4 +1,5 @@
-// features/auth/pages/register_page.dart — Flujo de bienvenida en cascada
+// features/auth/pages/create_account_page.dart
+// Flujo de registro unificado — Steps: 0=Credenciales 1=Datos 2=Académico 3=Confirmación
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,50 +12,57 @@ import '../domain/commands/login_command.dart';
 import '../domain/models/auth_state.dart';
 import '../providers/auth_provider.dart';
 
-class CompleteProfilePage extends ConsumerStatefulWidget {
-  const CompleteProfilePage({super.key});
+class CreateAccountPage extends ConsumerStatefulWidget {
+  const CreateAccountPage({super.key});
 
   @override
-  ConsumerState<CompleteProfilePage> createState() =>
-      _CompleteProfilePageState();
+  ConsumerState<CreateAccountPage> createState() => _CreateAccountPageState();
 }
 
-class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
+class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+  // ── Step 0 controllers ────────────────────────────────────────────────
+  final _credFormKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
+  bool _obscurePass = true;
+  bool _obscureConfirm = true;
+  String _detectedRole = '';
+  String _lastEmail = '';
+
+  // ── Step 1+ controllers ───────────────────────────────────────────────
+  final _profileFormKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _apellidoPaternoCtrl = TextEditingController();
   final _apellidoMaternoCtrl = TextEditingController();
   final _orgCtrl = TextEditingController();
-
-  bool _isLoading = false;
-  bool _showWakeUp = false;
-  Timer? _wakeUpTimer;
-  String? _errorMsg;
-
-  // Steps: 0=bienvenida 1=datos 2=contexto académico 3=confirmación
-  int _step = 0;
-
   String? _selectedCarreraId;
   String? _selectedMateriaId;
   List<String> _selectedGruposIds = [];
 
-  // Stagger animation per step
+  // ── Shared state ──────────────────────────────────────────────────────
+  bool _isLoading = false;
+  bool _showWakeUp = false;
+  String? _errorMsg;
+  Timer? _wakeUpTimer;
+  int _step = 0;
+
+  // ── Animations ────────────────────────────────────────────────────────
   late AnimationController _staggerCtrl;
   late List<Animation<double>> _fadeAnims;
   late List<Animation<Offset>> _slideAnims;
-
-  // Step 3 check icon scale
   late AnimationController _checkCtrl;
   late Animation<double> _checkScale;
 
-  static const _staggerCount = 5;
+  static const _staggerCount = 6;
 
-  String get _email {
-    final s = ref.read(authStateProvider);
-    if (s is AuthAuthenticated) return s.email;
-    return '';
-  }
+  // ── Computed helpers ──────────────────────────────────────────────────
+  bool get _isGuest => _detectedRole == 'Invitado';
+  bool get _isTeacher => _detectedRole == 'Docente';
+  bool get _isAlumno => _detectedRole == 'Alumno';
+  bool get _hasAcademicStep => _isTeacher || _isAlumno;
+  int get _totalSteps => _hasAcademicStep ? 3 : 2;
 
   String get _firebaseUid {
     final s = ref.read(authStateProvider);
@@ -62,33 +70,10 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     return '';
   }
 
-  String get _displayName {
-    final s = ref.read(authStateProvider);
-    if (s is AuthAuthenticated) return s.displayName.split(' ').first;
-    return '';
-  }
-
-  String get _detectedRole => RoleDetector.fromEmail(_email);
-  bool get _isGuest => _detectedRole == 'Invitado';
-  bool get _isTeacher => _detectedRole == 'Docente';
-  bool get _isAlumno => _detectedRole == 'Alumno';
-  // Invitado salta step 2
-  bool get _hasAcademicStep => _isTeacher || _isAlumno;
-
-  int get _totalSteps => _hasAcademicStep ? 3 : 2; // pasos 1..N visibles
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final s = ref.read(authStateProvider);
-      if (s is AuthAuthenticated) {
-        final dName = s.displayName;
-        if (dName.isNotEmpty && dName != 'Usuario') {
-          _nameCtrl.text = dName;
-        }
-      }
-    });
+    _emailCtrl.addListener(_onEmailChanged);
     _buildStaggerAnims();
     _checkCtrl = AnimationController(
       vsync: this,
@@ -100,21 +85,21 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   void _buildStaggerAnims() {
     _staggerCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 650),
+      duration: const Duration(milliseconds: 700),
     )..forward();
     _fadeAnims = List.generate(_staggerCount, (i) {
-      final start = (i * 0.14).clamp(0.0, 0.80);
-      final end = (start + 0.38).clamp(0.0, 1.0);
+      final start = (i * 0.12).clamp(0.0, 0.85);
+      final end = (start + 0.35).clamp(0.0, 1.0);
       return CurvedAnimation(
         parent: _staggerCtrl,
         curve: Interval(start, end, curve: Curves.easeOutCubic),
       );
     });
     _slideAnims = List.generate(_staggerCount, (i) {
-      final start = (i * 0.14).clamp(0.0, 0.80);
-      final end = (start + 0.38).clamp(0.0, 1.0);
+      final start = (i * 0.12).clamp(0.0, 0.85);
+      final end = (start + 0.35).clamp(0.0, 1.0);
       return Tween<Offset>(
-        begin: const Offset(0, 0.07),
+        begin: const Offset(0, 0.06),
         end: Offset.zero,
       ).animate(CurvedAnimation(
         parent: _staggerCtrl,
@@ -123,8 +108,19 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     });
   }
 
+  void _onEmailChanged() {
+    final email = _emailCtrl.text;
+    if (email == _lastEmail) return;
+    _lastEmail = email;
+    final role = email.isEmpty ? '' : RoleDetector.fromEmail(email);
+    if (role != _detectedRole) setState(() => _detectedRole = role);
+  }
+
   void _advanceStep(int next) {
-    setState(() => _step = next);
+    setState(() {
+      _step = next;
+      _errorMsg = null;
+    });
     _staggerCtrl.reset();
     _staggerCtrl.forward();
     if (next == 3) {
@@ -136,6 +132,10 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   @override
   void dispose() {
     _wakeUpTimer?.cancel();
+    _emailCtrl.removeListener(_onEmailChanged);
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmPassCtrl.dispose();
     _nameCtrl.dispose();
     _apellidoPaternoCtrl.dispose();
     _apellidoMaternoCtrl.dispose();
@@ -145,44 +145,42 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _gruposDeMateria(
-      List<Map<String, dynamic>> materias) {
-    if (_selectedMateriaId == null) return [];
-    for (final entry in materias) {
-      final mat = entry['materia'] as Map<String, dynamic>?;
-      if (mat?['id'] == _selectedMateriaId) {
-        return (entry['gruposDisponibles'] as List? ?? [])
-            .cast<Map<String, dynamic>>();
-      }
+  // ── Step 0: crear cuenta en Firebase ─────────────────────────────────
+  Future<void> _submitCredentials() async {
+    if (!_credFormKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+      _showWakeUp = false;
+    });
+    _wakeUpTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted && _isLoading) setState(() => _showWakeUp = true);
+    });
+
+    await ref.read(authStateProvider.notifier).createAccount(
+          LoginCommand(
+            email: _emailCtrl.text.trim(),
+            password: _passCtrl.text,
+          ),
+        );
+
+    _wakeUpTimer?.cancel();
+    final authState = ref.read(authStateProvider);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _showWakeUp = false;
+    });
+
+    if (authState is AuthAuthenticated) {
+      _advanceStep(1);
+    } else if (authState is AuthError) {
+      setState(() => _errorMsg = authState.message);
     }
-    return [];
   }
 
-  // ── Selector BottomSheet ────────────────────────────────────────────────
-  Future<T?> _showSelectorSheet<T>({
-    required BuildContext ctx,
-    required String title,
-    required List<Map<String, dynamic>> items,
-    required T? selected,
-    required String Function(Map<String, dynamic>) labelOf,
-    String? Function(Map<String, dynamic>)? subtitleOf,
-    required T Function(Map<String, dynamic>) valueOf,
-  }) {
-    return showModalBottomSheet<T>(
-      context: ctx,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _SelectorSheet<T>(
-        title: title,
-        items: items,
-        selected: selected,
-        labelOf: labelOf,
-        subtitleOf: subtitleOf,
-        valueOf: valueOf,
-      ),
-    );
-  }
-
+  // ── Step 1/2: completar perfil en el backend ─────────────────────────
   Future<void> _submitProfile() async {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -204,8 +202,8 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
         apellidoMaterno: _apellidoMaternoCtrl.text.trim().isNotEmpty
             ? _apellidoMaternoCtrl.text.trim()
             : null,
-        email: _email,
-        rol: _detectedRole,
+        email: _emailCtrl.text.trim(),
+        rol: _detectedRole.isEmpty ? 'Invitado' : _detectedRole,
         profesion: null,
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
@@ -236,7 +234,6 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
         setState(() => _errorMsg = authState.message);
         return;
       }
-
       _advanceStep(3);
     } catch (e) {
       if (!mounted) return;
@@ -249,6 +246,43 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     }
   }
 
+  List<Map<String, dynamic>> _gruposDeMateria(
+      List<Map<String, dynamic>> materias) {
+    if (_selectedMateriaId == null) return [];
+    for (final entry in materias) {
+      final mat = entry['materia'] as Map<String, dynamic>?;
+      if (mat?['id'] == _selectedMateriaId) {
+        return (entry['gruposDisponibles'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
+      }
+    }
+    return [];
+  }
+
+  Future<T?> _showSelectorSheet<T>({
+    required BuildContext ctx,
+    required String title,
+    required List<Map<String, dynamic>> items,
+    required T? selected,
+    required String Function(Map<String, dynamic>) labelOf,
+    String? Function(Map<String, dynamic>)? subtitleOf,
+    required T Function(Map<String, dynamic>) valueOf,
+  }) {
+    return showModalBottomSheet<T>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _SelectorSheet<T>(
+        title: title,
+        items: items,
+        selected: selected,
+        labelOf: labelOf,
+        subtitleOf: subtitleOf,
+        valueOf: valueOf,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -257,16 +291,17 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     Widget stagger(int i, Widget child) => FadeTransition(
           opacity: _fadeAnims[i.clamp(0, _staggerCount - 1)],
           child: SlideTransition(
-              position: _slideAnims[i.clamp(0, _staggerCount - 1)],
-              child: child),
+            position: _slideAnims[i.clamp(0, _staggerCount - 1)],
+            child: child,
+          ),
         );
 
     return PopScope(
       canPop: _step == 0,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _step > 0) {
+        if (!didPop && _step > 0 && _step < 3) {
           setState(() {
-            _step = _step - 1;
+            _step--;
             _errorMsg = null;
           });
           _staggerCtrl.reset();
@@ -276,11 +311,12 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
       child: Scaffold(
         backgroundColor:
             isDark ? AppColors.darkSurface0 : AppColors.lightBackground,
+        resizeToAvoidBottomInset: true,
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Header plano con progress pills ──────────────────────
+              // ── Step header (pills) ────────────────────────────────
               if (_step > 0 && _step < 3)
                 _StepHeader(
                   step: _step,
@@ -297,7 +333,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                   },
                 ),
 
-              // ── Contenido del step actual ─────────────────────────────
+              // ── Step content ───────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -346,159 +382,347 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     }
   }
 
-  // ── Step 0: Bienvenida ──────────────────────────────────────────────────
+  // ── Step 0: Credenciales ──────────────────────────────────────────────
   Widget _buildStep0(
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
+    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
 
-    final (roleIcon, roleLabel) = switch (_detectedRole) {
-      'Docente' => (Icons.school_rounded, 'Docente UTM'),
-      'Alumno' => (Icons.menu_book_rounded, 'Alumno UTM'),
-      'SuperAdmin' => (Icons.admin_panel_settings_rounded, 'Administrador'),
-      _ => (Icons.person_outline_rounded, 'Invitado'),
-    };
+    return Form(
+      key: _credFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 16),
 
-    final roleDesc = switch (_detectedRole) {
-      'Docente' =>
-        'Configura tus materias y grupos para gestionar\nlos proyectos de tus alumnos.',
-      'Alumno' =>
-        'Completa tu perfil para crear y publicar\nproyectos en la plataforma.',
-      'SuperAdmin' =>
-        'Configura tu perfil de administrador\npara gestionar la plataforma.',
-      _ => 'Explora y califica proyectos de todos\nlos estudiantes de la UTM.',
-    };
-
-    final name = _nameCtrl.text.isNotEmpty
-        ? _nameCtrl.text.split(' ').first
-        : _displayName;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 48),
-        stagger(
-          0,
-          Center(
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: accent.withOpacity(0.12),
-                shape: BoxShape.circle,
-                border: Border.all(color: accent.withOpacity(0.3)),
-                boxShadow: [
-                  BoxShadow(
-                      color: accent.withOpacity(0.2),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8)),
-                ],
+          // ── Botón volver ────────────────────────────────────────
+          stagger(
+            0,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: textPrimary),
+                onPressed: () =>
+                    context.canPop() ? context.pop() : context.go('/login'),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
               ),
-              child: Icon(Icons.hub_rounded, size: 36, color: accent),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
-        stagger(
-          1,
-          Text(
-            name.isNotEmpty ? '¡Hola, $name!' : '¡Bienvenido!',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.8,
-              color: textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 12),
-        stagger(
-          2,
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: accent.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                border: Border.all(color: accent.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: 12),
+
+          // ── Brand ────────────────────────────────────────────────
+          stagger(
+            1,
+            Center(
+              child: Column(
                 children: [
-                  Icon(roleIcon, size: 14, color: accent),
-                  const SizedBox(width: 5),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface2 : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withOpacity(0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Icon(Icons.hub_rounded, size: 24, color: accent),
+                  ),
+                  const SizedBox(height: 10),
                   Text(
-                    roleLabel,
+                    'Crear cuenta',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: accent,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                      letterSpacing: -0.8,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Completa tus datos para registrarte',
+                    style: TextStyle(
+                        fontFamily: 'Inter', fontSize: 13, color: mutedColor),
                   ),
                 ],
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        stagger(
-          3,
-          Text(
-            roleDesc,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              height: 1.6,
-              color: mutedColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 40),
-        stagger(
-          4,
-          SizedBox(
-            height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: () => _advanceStep(1),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Comenzar',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
+          const SizedBox(height: 28),
+
+          // ── Correo + chip rol ─────────────────────────────────────
+          stagger(
+            2,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FormLabel('Correo electrónico', isDark: isDark),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  style: TextStyle(
+                      fontFamily: 'Inter', fontSize: 15, color: textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'correo@institucion.edu',
+                    prefixIcon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        _detectedRole == 'Docente' ||
+                                _detectedRole == 'SuperAdmin'
+                            ? Icons.school_rounded
+                            : _detectedRole == 'Alumno'
+                                ? Icons.person_rounded
+                                : Icons.email_outlined,
+                        key: ValueKey(_detectedRole),
+                        size: 18,
+                        color: _detectedRole.isNotEmpty &&
+                                _detectedRole != 'Invitado'
+                            ? accent
+                            : mutedColor,
+                      ),
+                    ),
+                    suffixIcon: AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      child: _detectedRole.isNotEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: accent.withOpacity(0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
+                                  border: Border.all(
+                                      color: accent.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(_roleIcon(_detectedRole),
+                                        size: 11, color: accent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _roleLabel(_detectedRole),
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
-              ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Ingresa tu correo';
+                    if (!v.contains('@')) return 'Correo inválido';
+                    return null;
+                  },
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 32),
-      ],
+          const SizedBox(height: 16),
+
+          // ── Contraseña ────────────────────────────────────────────
+          stagger(
+            3,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FormLabel('Contraseña', isDark: isDark),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _passCtrl,
+                  obscureText: _obscurePass,
+                  textInputAction: TextInputAction.next,
+                  style: TextStyle(
+                      fontFamily: 'Inter', fontSize: 15, color: textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Mínimo 6 caracteres',
+                    prefixIcon: Icon(Icons.lock_outline_rounded,
+                        size: 18, color: mutedColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePass
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 18,
+                        color: mutedColor,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePass = !_obscurePass),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
+                    if (v.length < 6) return 'Mínimo 6 caracteres';
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Confirmar contraseña ──────────────────────────────────
+          stagger(
+            4,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FormLabel('Confirmar contraseña', isDark: isDark),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _confirmPassCtrl,
+                  obscureText: _obscureConfirm,
+                  textInputAction: TextInputAction.done,
+                  style: TextStyle(
+                      fontFamily: 'Inter', fontSize: 15, color: textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Repite tu contraseña',
+                    prefixIcon: Icon(Icons.lock_outline_rounded,
+                        size: 18, color: mutedColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirm
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 18,
+                        color: mutedColor,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Confirma tu contraseña';
+                    if (v != _passCtrl.text)
+                      return 'Las contraseñas no coinciden';
+                    return null;
+                  },
+                  onFieldSubmitted: (_) => _submitCredentials(),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Banners ───────────────────────────────────────────────
+          if (_errorMsg != null) ...[
+            const SizedBox(height: 8),
+            _AlertBanner(
+              color: AppColors.error,
+              icon: Icons.error_outline_rounded,
+              message: _errorMsg!,
+            ),
+          ],
+          if (_showWakeUp) ...[
+            const SizedBox(height: 8),
+            _AlertBanner(
+              color: AppColors.warning,
+              icon: Icons.hourglass_top_rounded,
+              message:
+                  'Servidor despertando… Esto solo ocurre en la primera conexión del día.',
+              showSpinner: true,
+            ),
+          ],
+          const SizedBox(height: 28),
+
+          // ── CTA + link ────────────────────────────────────────────
+          stagger(
+            5,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBtn,
+                      foregroundColor: primaryBtnText,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.full)),
+                    ),
+                    onPressed: _isLoading ? null : _submitCredentials,
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: primaryBtnText),
+                          )
+                        : Text(
+                            'Continuar',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.3,
+                              color: primaryBtnText,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '¿Ya tienes una cuenta?',
+                      style: TextStyle(
+                          fontFamily: 'Inter', fontSize: 14, color: mutedColor),
+                    ),
+                    TextButton(
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/login'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Iniciar sesión',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ── Step 1: Datos personales ────────────────────────────────────────────
+  // ── Step 1: Datos personales ──────────────────────────────────────────
   Widget _buildStep1(
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
     final textPrimary =
@@ -507,11 +731,13 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
 
     return Form(
-      key: _formKey,
+      key: _profileFormKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
+
+          // Nombre
           stagger(
             0,
             Column(
@@ -537,6 +763,8 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
             ),
           ),
           const SizedBox(height: 12),
+
+          // Apellidos
           stagger(
             1,
             Row(
@@ -575,7 +803,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _apellidoMaternoCtrl,
-                        textInputAction: TextInputAction.next,
+                        textInputAction: TextInputAction.done,
                         textCapitalization: TextCapitalization.words,
                         style: TextStyle(
                             fontFamily: 'Inter',
@@ -594,10 +822,12 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
               ],
             ),
           ),
+
+          // Organización (solo invitados)
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeInOut,
-            child: _email.isNotEmpty && _isGuest
+            child: _isGuest
                 ? Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: stagger(
@@ -626,18 +856,26 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                   )
                 : const SizedBox.shrink(),
           ),
+
           if (_errorMsg != null) ...[
             const SizedBox(height: 14),
-            stagger(
-              3,
-              _ErrorBanner(message: _errorMsg!),
-            ),
+            _AlertBanner(
+                color: AppColors.error,
+                icon: Icons.error_outline_rounded,
+                message: _errorMsg!),
           ],
           if (_showWakeUp) ...[
             const SizedBox(height: 8),
-            stagger(3, const _WakeUpBanner()),
+            _AlertBanner(
+              color: AppColors.warning,
+              icon: Icons.hourglass_top_rounded,
+              message:
+                  'Servidor despertando… Esto solo ocurre en la primera conexión del día.',
+              showSpinner: true,
+            ),
           ],
           const SizedBox(height: 28),
+
           stagger(
             4,
             SizedBox(
@@ -654,7 +892,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                 onPressed: _isLoading
                     ? null
                     : () {
-                        if (!_formKey.currentState!.validate()) return;
+                        if (!_profileFormKey.currentState!.validate()) return;
                         FocusScope.of(context).unfocus();
                         if (_hasAcademicStep) {
                           ref.read(catalogProvider.notifier).loadCarreras();
@@ -688,7 +926,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     );
   }
 
-  // ── Step 2: Contexto académico ──────────────────────────────────────────
+  // ── Step 2: Datos académicos ──────────────────────────────────────────
   Widget _buildStep2(
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
     final textPrimary =
@@ -724,7 +962,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
       children: [
         const SizedBox(height: 8),
 
-        // ── Selector carrera ──────────────────────────────────────────
+        // Selector carrera
         stagger(
           0,
           Column(
@@ -763,10 +1001,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
             ],
           ),
         ),
-
         const SizedBox(height: 12),
 
-        // ── Selector materia ─────────────────────────────────────────
+        // Selector materia (solo docentes)
         if (_isTeacher) ...[
           stagger(
             1,
@@ -819,10 +1056,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
               ],
             ),
           ),
-
           const SizedBox(height: 12),
 
-          // ── FilterChip grupos ───────────────────────────────────────
+          // FilterChips grupos
           if (_selectedMateriaId != null && grupos.isNotEmpty)
             stagger(
               2,
@@ -899,13 +1135,21 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
 
         if (_errorMsg != null) ...[
           const SizedBox(height: 14),
-          stagger(3, _ErrorBanner(message: _errorMsg!)),
+          _AlertBanner(
+              color: AppColors.error,
+              icon: Icons.error_outline_rounded,
+              message: _errorMsg!),
         ],
         if (_showWakeUp) ...[
           const SizedBox(height: 8),
-          stagger(3, const _WakeUpBanner()),
+          _AlertBanner(
+            color: AppColors.warning,
+            icon: Icons.hourglass_top_rounded,
+            message:
+                'Servidor despertando… Esto solo ocurre en la primera conexión del día.',
+            showSpinner: true,
+          ),
         ],
-
         const SizedBox(height: 28),
 
         stagger(
@@ -941,22 +1185,20 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
             ),
           ),
         ),
-
         const SizedBox(height: 32),
       ],
     );
   }
 
-  // ── Step 3: Confirmación ────────────────────────────────────────────────
+  // ── Step 3: Confirmación ──────────────────────────────────────────────
   Widget _buildStep3(
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-    final name = _nameCtrl.text.isNotEmpty
-        ? _nameCtrl.text.split(' ').first
-        : _displayName;
+    final name =
+        _nameCtrl.text.isNotEmpty ? _nameCtrl.text.split(' ').first : '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -986,7 +1228,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
         stagger(
           1,
           Text(
-            '¡Listo, $name!',
+            name.isNotEmpty ? '¡Listo, $name!' : '¡Cuenta creada!',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 28,
@@ -1049,6 +1291,20 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
       ],
     );
   }
+
+  IconData _roleIcon(String role) => switch (role) {
+        'Docente' => Icons.school_rounded,
+        'Alumno' => Icons.menu_book_rounded,
+        'SuperAdmin' => Icons.admin_panel_settings_rounded,
+        _ => Icons.person_outline_rounded,
+      };
+
+  String _roleLabel(String role) => switch (role) {
+        'Docente' => 'Docente UTM',
+        'Alumno' => 'Alumno UTM',
+        'SuperAdmin' => 'Admin',
+        _ => 'Invitado',
+      };
 }
 
 // ── Step Header con progress pills ─────────────────────────────────────────
@@ -1069,7 +1325,7 @@ class _StepHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['', 'Datos personales', 'Contexto académico', ''];
+    const titles = ['', 'Datos personales', 'Contexto académico', ''];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 24, 4),
       child: Row(
@@ -1128,7 +1384,7 @@ class _StepHeader extends StatelessWidget {
   }
 }
 
-// ── Selector Row (reemplaza DropdownButtonFormField) ────────────────────────
+// ── Selector Row ─────────────────────────────────────────────────────────────
 
 class _SelectorRow extends StatelessWidget {
   const _SelectorRow({
@@ -1193,7 +1449,7 @@ class _SelectorRow extends StatelessWidget {
   }
 }
 
-// ── Selector BottomSheet ─────────────────────────────────────────────────────
+// ── Selector BottomSheet ──────────────────────────────────────────────────────
 
 class _SelectorSheet<T> extends StatelessWidget {
   const _SelectorSheet({
@@ -1232,7 +1488,6 @@ class _SelectorSheet<T> extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle
               Container(
                 margin: const EdgeInsets.only(top: 10, bottom: 4),
                 width: 36,
@@ -1281,10 +1536,9 @@ class _SelectorSheet<T> extends StatelessWidget {
                           ? Text(
                               subtitle,
                               style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                color: mutedColor,
-                              ),
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: mutedColor),
                             )
                           : null,
                       trailing: isSelected
@@ -1304,65 +1558,50 @@ class _SelectorSheet<T> extends StatelessWidget {
   }
 }
 
-// ── Subwidgets utilitarios ──────────────────────────────────────────────────
+// ── Alert Banner ─────────────────────────────────────────────────────────────
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+class _AlertBanner extends StatelessWidget {
+  const _AlertBanner({
+    required this.color,
+    required this.icon,
+    required this.message,
+    this.showSpinner = false,
+  });
+  final Color color;
+  final IconData icon;
   final String message;
+  final bool showSpinner;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.error.withAlpha(20),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.error.withAlpha(80)),
+        border: Border.all(color: color.withOpacity(0.25), width: 1),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 16, color: AppColors.error),
-          const SizedBox(width: 8),
+          if (showSpinner)
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+            )
+          else
+            Icon(icon, size: 16, color: color),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 13, color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WakeUpBanner extends StatelessWidget {
-  const _WakeUpBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withAlpha(20),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.warning.withAlpha(80)),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: AppColors.warning),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Servidor despertando... Esto solo ocurre en la primera conexión del día.',
               style: TextStyle(
-                  fontFamily: 'Inter', fontSize: 12, color: AppColors.warning),
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: color,
+                height: 1.4,
+              ),
             ),
           ),
         ],

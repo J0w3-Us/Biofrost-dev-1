@@ -1,12 +1,11 @@
 // bootstrap.dart — Inicialización centralizada (patrón VGV)
 import 'dart:async';
 import 'dart:io';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/notifications/notification_service.dart';
-import 'firebase_options.dart';
 
 typedef AppBuilder = Widget Function();
 
@@ -43,15 +42,11 @@ Future<void> bootstrap(
   // Despertar API de Render en paralelo, sin bloquear la inicialización
   _warmupApi();
 
-  if (Firebase.apps.isEmpty) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    } on FirebaseException catch (e) {
-      if (e.code != 'duplicate-app') rethrow;
-    }
-  }
+  // Locale para intl/DateFormat — no depende de Firebase, puede correr primero
+  await initializeDateFormatting('es', null);
+
+  // Paso 3: Firebase ya fue inicializado en main() antes de llamar bootstrap().
+  // NotificationService se inicializa aquí de forma secuencial y segura.
   await NotificationService.instance.initialize();
 
   runApp(

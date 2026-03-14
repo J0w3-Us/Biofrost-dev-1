@@ -43,4 +43,12 @@ class ProfileRemoteDatasource {
       data: {'redesSociales': links},
     );
   }
+
+  /// Actualiza el nombre de display del usuario en el backend.
+  Future<void> updateDisplayName(String uid, String name) async {
+    await _dio.put(
+      ApiEndpoints.userDisplayName(uid),
+      data: {'displayName': name},
+    );
+  }
 }

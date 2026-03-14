@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/models/auth_state.dart';
+import '../../features/auth/pages/create_account_page.dart';
 import '../../features/auth/pages/login_page.dart';
-import '../../features/auth/pages/complete_profile_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/showcase/pages/showcase_page.dart';
 import '../../features/splash/pages/splash_page.dart';
@@ -19,7 +19,7 @@ import '../widgets/shell_scaffold.dart';
 const _publicRoutes = [
   '/splash',
   '/login',
-  '/register',
+  '/create-account',
   '/showcase',
   '/project',
   '/ranking'
@@ -44,17 +44,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return isPublic ? null : '/login';
 
         case AuthAuthenticated(:final isFirstLogin):
-          // Si aún necesita completar datos, ir a /register
-          if (isFirstLogin && loc != '/register') return '/register';
+          // Si aún necesita completar datos, continuar en /create-account
+          if (isFirstLogin && loc != '/create-account')
+            return '/create-account';
           // Si ya completó, salir de las pantallas de auth
           if (!isFirstLogin &&
-              (loc == '/login' || loc == '/splash' || loc == '/register')) {
+              (loc == '/login' ||
+                  loc == '/splash' ||
+                  loc == '/create-account')) {
             return '/showcase';
           }
           return null;
 
         case AuthError():
-          return (loc == '/login' || loc == '/splash') ? null : '/login';
+          return (loc == '/login' ||
+                  loc == '/splash' ||
+                  loc == '/create-account')
+              ? null
+              : '/login';
       }
     },
     routes: [
@@ -70,8 +77,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
-        path: '/register',
-        builder: (context, state) => const CompleteProfilePage(),
+        path: '/create-account',
+        builder: (context, state) => const CreateAccountPage(),
       ),
       // ── Shell con NavBar ──────────────────────────────────────────────
       ShellRoute(

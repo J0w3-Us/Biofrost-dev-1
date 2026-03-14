@@ -2,12 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/bio_empty_state.dart';
 import '../../../core/widgets/ui_kit.dart';
-import '../../../features/auth/domain/models/auth_state.dart';
-import '../../../features/auth/providers/auth_provider.dart';
+import '../../notifications/providers/notifications_provider.dart';
 import '../domain/models/project_read_model.dart';
 import '../providers/showcase_provider.dart';
 import '../widgets/project_card.dart';
@@ -19,35 +19,22 @@ class ShowcasePage extends ConsumerStatefulWidget {
   ConsumerState<ShowcasePage> createState() => _ShowcasePageState();
 }
 
-class _ShowcasePageState extends ConsumerState<ShowcasePage>
-    with SingleTickerProviderStateMixin {
+class _ShowcasePageState extends ConsumerState<ShowcasePage> {
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   String _selectedTech = '';
   bool _isSearchExpanded = false;
 
-  // For a subtle fade-in animation on the greeting
-  late final AnimationController _greetCtrl;
-  late final Animation<double> _greetFade;
-
   @override
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    _greetCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _greetFade =
-        CurvedAnimation(parent: _greetCtrl, curve: Curves.easeOut);
-    _greetCtrl.forward();
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
-    _greetCtrl.dispose();
     super.dispose();
   }
 
@@ -71,10 +58,8 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
     final state = ref.watch(showcaseProvider);
     final filteredProjects = ref.watch(filteredProjectsProvider);
     final filters = ref.watch(showcaseFiltersProvider);
-    final auth = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final userName = auth is AuthAuthenticated ? auth.displayName : null;
     final techs = _extractTechs(state.projects);
 
     return Scaffold(
@@ -137,8 +122,8 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
                             }
                           },
                         ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 0),
                         filled: true,
                         fillColor: isDark
                             ? AppColors.darkSurface2
@@ -172,7 +157,53 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
                     ),
                   ),
             actions: [
-              if (!_isSearchExpanded)
+              if (!_isSearchExpanded) ...[
+                // ── Bell icon with badge ─────────────────────────────────
+                Consumer(
+                  builder: (_, bellRef, __) {
+                    final notifs = bellRef.watch(notificationsProvider);
+                    final unread = notifs.where((n) => !n.isRead).length;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.notifications_outlined,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightForeground,
+                          ),
+                          onPressed: () =>
+                              _showNotificationsSheet(context, bellRef),
+                        ),
+                        if (unread > 0)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                  minWidth: 16, minHeight: 16),
+                              child: Text(
+                                '$unread',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
                 IconButton(
                   icon: Icon(
                     Icons.search_rounded,
@@ -186,6 +217,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
                     });
                   },
                 ),
+              ],
               const SizedBox(width: 8),
             ],
             bottom: techs.isNotEmpty
@@ -237,8 +269,21 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
     );
   }
 
+  // ── Notifications BottomSheet ──────────────────────────────────────────────
+  void _showNotificationsSheet(BuildContext ctx, WidgetRef sheetRef) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NotificationsBottomSheet(ref: sheetRef),
+    );
+  }
+
   Widget _buildBody(
-      ShowcaseState state, List<ProjectReadModel> filteredProjects, ShowcaseFilters filters, bool isDark) {
+      ShowcaseState state,
+      List<ProjectReadModel> filteredProjects,
+      ShowcaseFilters filters,
+      bool isDark) {
     if (state.isLoading) {
       return _buildSkeletons(isDark);
     }
@@ -251,23 +296,19 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage>
     }
 
     if (!state.isLoading && filteredProjects.isEmpty) {
-      final isFiltered =
-          filters.search.isNotEmpty || filters.category != null;
+      final isFiltered = filters.search.isNotEmpty || filters.category != null;
       return BioEmptyState(
         title: isFiltered ? 'Sin resultados' : 'Aún no hay proyectos',
         subtitle: isFiltered
             ? 'Intenta con otro término de búsqueda'
             : 'Los proyectos aparecerán aquí pronto.',
-        icon: isFiltered
-            ? Icons.search_off_rounded
-            : Icons.folder_open_rounded,
+        icon: isFiltered ? Icons.search_off_rounded : Icons.folder_open_rounded,
         isDark: isDark,
       );
     }
 
     return RefreshIndicator(
-      onRefresh: () =>
-          ref.read(showcaseProvider.notifier).load(refresh: true),
+      onRefresh: () => ref.read(showcaseProvider.notifier).load(refresh: true),
       color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
       backgroundColor:
           isDark ? AppColors.darkSurface2 : AppColors.lightSecondary,
@@ -330,8 +371,7 @@ class _AnimatedFeedItemState extends State<_AnimatedFeedItem>
       begin: const Offset(0, 0.06),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-    _fade =
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
 
     Future.delayed(Duration(milliseconds: delay), () {
       if (mounted) _ctrl.forward();
@@ -434,9 +474,7 @@ class _SkeletonFeedCard extends StatelessWidget {
                           (_) => Padding(
                             padding: const EdgeInsets.only(right: 3),
                             child: BioSkeleton(
-                                width: 14,
-                                height: 14,
-                                radius: AppRadius.full),
+                                width: 14, height: 14, radius: AppRadius.full),
                           ),
                         ),
                       ),
@@ -447,6 +485,196 @@ class _SkeletonFeedCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+// ── Notifications BottomSheet ──────────────────────────────────────────────
+
+class _NotificationsBottomSheet extends StatelessWidget {
+  const _NotificationsBottomSheet({required this.ref});
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final notifications = ref.watch(notificationsProvider);
+    final notifier = ref.read(notificationsProvider.notifier);
+    final fmt = DateFormat('d MMM, HH:mm', 'es');
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+        ),
+        child: Column(
+          children: [
+            // ── Handle ────────────────────────────────────────────────
+            const SizedBox(height: AppSpacing.sp12),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sp16),
+
+            // ── Header ────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp20),
+              child: Row(
+                children: [
+                  Text(
+                    'Notificaciones',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightForeground,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (notifications.isNotEmpty)
+                    TextButton(
+                      onPressed: notifier.clearAll,
+                      child: Text(
+                        'Limpiar todo',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.lightPrimary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // ── List ──────────────────────────────────────────────────
+            Expanded(
+              child: notifications.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.notifications_none_rounded,
+                            size: 48,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightMutedFg,
+                          ),
+                          const SizedBox(height: AppSpacing.sp12),
+                          Text(
+                            'Sin notificaciones',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 15,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightMutedFg,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollCtrl,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sp8),
+                      itemCount: notifications.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 20, endIndent: 20),
+                      itemBuilder: (_, i) {
+                        final n = notifications[i];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sp20,
+                              vertical: AppSpacing.sp4),
+                          leading: CircleAvatar(
+                            backgroundColor: n.isRead
+                                ? (isDark
+                                    ? AppColors.darkSurface2
+                                    : AppColors.lightMuted)
+                                : (isDark
+                                        ? AppColors.darkPrimary
+                                        : AppColors.lightPrimary)
+                                    .withValues(alpha: 0.15),
+                            child: Icon(
+                              Icons.notifications_rounded,
+                              size: 20,
+                              color: n.isRead
+                                  ? (isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightMutedFg)
+                                  : (isDark
+                                      ? AppColors.darkPrimary
+                                      : AppColors.lightPrimary),
+                            ),
+                          ),
+                          title: Text(
+                            n.title,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              fontWeight:
+                                  n.isRead ? FontWeight.w400 : FontWeight.w600,
+                              color: isDark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightForeground,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (n.body.isNotEmpty)
+                                Text(
+                                  n.body,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? AppColors.darkTextSecondary
+                                        : AppColors.lightMutedFg,
+                                  ),
+                                ),
+                              Text(
+                                fmt.format(n.receivedAt),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightMutedFg,
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () => notifier.markRead(n.id),
+                        );
+                      },
+                    ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),

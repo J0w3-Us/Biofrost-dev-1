@@ -35,6 +35,7 @@ class AuthAuthenticated extends AuthState {
     this.organizacion,
     this.especialidadDocente,
     this.createdAt,
+    this.socialLinks,
   });
 
   final String uid;
@@ -55,6 +56,7 @@ class AuthAuthenticated extends AuthState {
   final String? organizacion;
   final String? especialidadDocente;
   final String? createdAt;
+  final Map<String, String>? socialLinks;
 
   // Getters tipados según el backend
   bool get isTeacher => role == 'Docente';

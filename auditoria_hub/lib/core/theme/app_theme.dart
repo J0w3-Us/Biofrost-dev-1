@@ -13,21 +13,21 @@ abstract class AppColors {
   static const darkSurface2 = Color(0xFF2C2C2E); // iOS grouped row
   static const darkSurface3 = Color(0xFF3A3A3C); // iOS elevated surface
 
-  static const darkBorder = Color(0xFF38383A);      // Subtle separator
+  static const darkBorder = Color(0xFF38383A); // Subtle separator
   static const darkBorderFocus = Color(0xFF0A84FF); // iOS blue focus ring
 
-  static const darkPrimary = Color(0xFFFFFFFF);   // White primary
-  static const darkAccent = Color(0xFF0A84FF);    // iOS Blue
+  static const darkPrimary = Color(0xFFFFFFFF); // White primary
+  static const darkAccent = Color(0xFF0A84FF); // iOS Blue
 
   static const darkTextPrimary = Color(0xFFFFFFFF);
   static const darkTextSecondary = Color(0xFF8E8E93); // iOS secondary label
-  static const darkTextDisabled = Color(0xFF48484A);  // iOS tertiary label
+  static const darkTextDisabled = Color(0xFF48484A); // iOS tertiary label
   static const darkTextInverse = Color(0xFF000000);
 
   static const darkSuccess = Color(0xFF30D158); // iOS Green
-  static const darkError = Color(0xFFFF453A);   // iOS Red
+  static const darkError = Color(0xFFFF453A); // iOS Red
   static const darkWarning = Color(0xFFFF9F0A); // iOS Orange
-  static const darkInfo = Color(0xFF0A84FF);    // iOS Blue
+  static const darkInfo = Color(0xFF0A84FF); // iOS Blue
 
   // Badge bg colors
   static const badgeActiveBg = Color(0xFF0A2F1A);
@@ -35,34 +35,37 @@ abstract class AppColors {
   static const badgeBorradorBg = Color(0xFF2C2C2E);
 
   // Podium colors
-  static const podiumGold = Color(0xFFFFD60A);   // iOS Yellow
+  static const podiumGold = Color(0xFFFFD60A); // iOS Yellow
   static const podiumSilver = Color(0xFF8E8E93); // iOS Gray
   static const podiumBronze = Color(0xFFBF5AF2); // iOS Purple (distinctive)
 
   // ── Biofrost Brand Palette ────────────────────────────────────────────
   static const brandCream = Color(0xFFF2F2F7); // Apple light background
   static const brandSlate = Color(0xFFC7C7CC); // Apple separator
-  static const brandNavy = Color(0xFF1C1C1E);  // Apple label
+  static const brandNavy = Color(0xFF1C1C1E); // Apple label
 
-  // ── Light mode — Apple iOS Light palette ──────────────────────────────
-  static const lightBackground = Color(0xFFF2F2F7);  // iOS system background
-  static const lightForeground = Color(0xFF1C1C1E);  // iOS label
-  static const lightCard = Color(0xFFFFFFFF);         // iOS secondary background
-  static const lightPrimary = Color(0xFF1C1C1E);      // Almost black — primary action
-  static const lightAccent = Color(0xFF0A84FF);       // iOS Blue — CTA accent
-  static const lightSecondary = Color(0xFFE5E5EA);    // iOS fill tertiary
-  static const lightMuted = Color(0xFFEFEFF4);        // iOS grouped background
-  static const lightMutedFg = Color(0xFF8E8E93);      // iOS secondary label
-  static const lightBorder = Color(0xFFC7C7CC);       // iOS separator
-  static const lightInput = Color(0xFFE5E5EA);        // iOS fill secondary
-  static const lightSidebar = Color(0xFF1C1C1E);      // dark nav
-  static const lightDestructive = Color(0xFFFF3B30);  // iOS Red
+  // ── Light mode — Biofrost Green palette ────────────────────────────────
+  static const lightBackground = Color(0xFFE4E3D9); // Warm beige scaffold
+  static const lightForeground = Color(0xFF1C1C1E); // iOS label — unchanged
+  static const lightCard = Color(0xFFFFFFFF); // Pure white surface
+  static const lightPrimary = Color(0xFF02790A); // Vibrant green — primary CTA
+  static const lightAccent =
+      Color(0xFF02790A); // Vibrant green — unified action
+  static const lightOlive =
+      Color(0xFF7A794E); // Olive green — secondary/support
+  static const lightSecondary = Color(0xFFE5E5EA); // iOS fill tertiary
+  static const lightMuted = Color(0xFFEFEFF4); // iOS grouped background
+  static const lightMutedFg = Color(0xFF8E8E93); // iOS secondary label
+  static const lightBorder = Color(0xFFD4D3CA); // Warm-tinted separator
+  static const lightInput = Color(0xFFDDDCD4); // Warm input fill
+  static const lightSidebar = Color(0xFF1C1C1E); // dark nav
+  static const lightDestructive = Color(0xFFFF3B30); // iOS Red
 
   // ── Shared ─────────────────────────────────────────────────────────────
   static const success = Color(0xFF30D158); // iOS Green
-  static const error = Color(0xFFFF3B30);   // iOS Red
+  static const error = Color(0xFFFF3B30); // iOS Red
   static const warning = Color(0xFFFF9F0A); // iOS Orange
-  static const info = Color(0xFF0A84FF);    // iOS Blue
+  static const info = Color(0xFF0A84FF); // iOS Blue
 }
 
 // ── Espaciado y Radios — Apple style ───────────────────────────────────────
@@ -74,22 +77,26 @@ abstract class AppSpacing {
   static const sp8 = 8.0;
   static const sp10 = 10.0;
   static const sp12 = 12.0;
+  static const sp13 = 13.0;
   static const sp14 = 14.0;
   static const sp16 = 16.0;
   static const sp20 = 20.0;
   static const sp24 = 24.0;
+  static const sp28 = 28.0;
   static const sp32 = 32.0;
   static const sp40 = 40.0;
   static const sp48 = 48.0;
+  static const sp52 = 52.0;
+  static const sp62 = 62.0;
   static const sp64 = 64.0;
 }
 
 abstract class AppRadius {
-  static const xs = 8.0;   // Small pills, tiny chips - Slightly softer
-  static const sm = 12.0;  // Input fields - Softer inputs
-  static const md = 16.0;  // Cards - Apple squircle standard
-  static const lg = 24.0;  // Large cards, inner panels
-  static const xl = 32.0;  // Hero sections, bottom sheets
+  static const xs = 8.0; // Small pills, tiny chips - Slightly softer
+  static const sm = 12.0; // Input fields - Softer inputs
+  static const md = 16.0; // Cards - Apple squircle standard
+  static const lg = 24.0; // Large cards, inner panels
+  static const xl = 32.0; // Hero sections, bottom sheets
   static const xxl = 40.0; // Modals, extreme smooth panels
   static const full = 999.0;
 }
@@ -281,7 +288,8 @@ abstract class AppTheme {
             return AppColors.darkTextSecondary;
           }),
           trackColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) return AppColors.darkAccent;
+            if (states.contains(WidgetState.selected))
+              return AppColors.darkAccent;
             return AppColors.darkSurface3;
           }),
         ),
@@ -326,68 +334,71 @@ abstract class AppTheme {
         fontFamily: _fontFamily,
         colorScheme: const ColorScheme.light(
           brightness: Brightness.light,
-          primary: AppColors.lightPrimary,
+          primary: AppColors.lightPrimary, // Vibrant green
           onPrimary: Colors.white,
-          secondary: AppColors.lightAccent,
+          secondary: AppColors.lightOlive, // Olive green
           onSecondary: Colors.white,
-          surface: AppColors.lightCard,
-          onSurface: AppColors.lightForeground,
+          surface: AppColors.lightCard, // Pure white
+          onSurface: AppColors.lightForeground, // Very dark grey
           error: AppColors.lightDestructive,
           outline: AppColors.lightBorder,
           onSurfaceVariant: AppColors.lightMutedFg,
           surfaceContainerHighest: AppColors.lightMuted,
           secondaryContainer: AppColors.lightSecondary,
         ),
-        scaffoldBackgroundColor: AppColors.lightBackground,
+        scaffoldBackgroundColor: AppColors.lightBackground, // Warm beige
         textTheme:
             _buildTextTheme(AppColors.lightForeground, AppColors.lightMutedFg),
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
-          scrolledUnderElevation: 0.5,
-          backgroundColor: AppColors.lightBackground,
+          scrolledUnderElevation: 0,
+          backgroundColor: AppColors.lightBackground, // Matches scaffold
           foregroundColor: AppColors.lightForeground,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           titleTextStyle: TextStyle(
             fontFamily: _fontFamily,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
             color: AppColors.lightForeground,
           ),
         ),
         cardTheme: CardThemeData(
-          elevation: 0,
+          // No border — depth via shadow only
+          elevation: 4,
+          shadowColor: Color(0x1A000000), // ~10% black, crisp on beige
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            side: const BorderSide(color: AppColors.lightBorder, width: 0.5),
+            borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
           ),
           color: AppColors.lightCard,
+          surfaceTintColor: Colors.transparent,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: AppColors.lightInput,
+          // Pure white fill — search bar stands out cleanly against beige scaffold
+          fillColor: AppColors.lightCard,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            borderSide: const BorderSide(color: Colors.transparent),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            borderSide: const BorderSide(color: Colors.transparent),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            borderSide:
-                const BorderSide(color: AppColors.lightPrimary, width: 1.5),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            borderSide: const BorderSide(
+                color: AppColors.lightPrimary, width: 1.5), // Green focus
           ),
           errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             borderSide: const BorderSide(color: AppColors.lightDestructive),
           ),
           focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             borderSide:
                 const BorderSide(color: AppColors.lightDestructive, width: 1.5),
           ),
@@ -397,6 +408,23 @@ abstract class AppTheme {
               color: AppColors.lightMutedFg),
           prefixIconColor: AppColors.lightMutedFg,
           suffixIconColor: AppColors.lightMutedFg,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.lightPrimary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            textStyle: const TextStyle(
+              fontFamily: _fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(AppRadius.xl)),
+            ),
+          ),
         ),
         dividerTheme: const DividerThemeData(
           color: AppColors.lightBorder,
@@ -409,7 +437,8 @@ abstract class AppTheme {
             return Colors.white;
           }),
           trackColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) return AppColors.lightAccent;
+            if (states.contains(WidgetState.selected))
+              return AppColors.lightPrimary; // Green track
             return AppColors.lightSecondary;
           }),
         ),
@@ -440,11 +469,20 @@ abstract class AppTheme {
           ),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: AppColors.lightCard,
-          selectedItemColor: AppColors.lightAccent,
+          backgroundColor: AppColors.lightCard, // Solid white — no translucency
+          selectedItemColor: AppColors.lightPrimary, // Vibrant green
           unselectedItemColor: AppColors.lightMutedFg,
-          elevation: 0,
+          elevation: 12,
           type: BottomNavigationBarType.fixed,
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.lightCard,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl),
+            ),
+          ),
         ),
       );
 }

@@ -33,6 +33,8 @@ class ApiEndpoints {
   static String userPublicProfile(String id) => '/api/users/$id/profile';
   static String userPhoto(String id) => '/api/users/$id/photo';
   static String userSocialLinks(String id) => '/api/users/$id/social';
+  static String userDisplayName(String id) => '/api/users/$id/display-name';
+  static String userSoftDelete(String id) => '/api/users/$id/soft-delete';
 
   // ── Admin — Catálogos (para registro docente) ─────────────────────────
   static const String adminCarreras = '/api/admin/carreras';

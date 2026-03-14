@@ -2,25 +2,45 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../domain/commands/submit_evaluation_command.dart';
 import '../domain/models/project_detail_read_model.dart';
 import '../providers/project_detail_provider.dart';
+import '../widgets/rubric_evaluation_section.dart';
 
-class ProjectDetailPage extends ConsumerWidget {
+class ProjectDetailPage extends ConsumerStatefulWidget {
   const ProjectDetailPage({super.key, required this.projectId});
   final String projectId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(projectDetailProvider(projectId));
+  ConsumerState<ProjectDetailPage> createState() => _ProjectDetailPageState();
+}
+
+class _ProjectDetailPageState extends ConsumerState<ProjectDetailPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(projectDetailProvider(widget.projectId));
     final auth = ref.watch(authStateProvider);
     final isTeacher = auth is AuthAuthenticated && auth.isTeacher;
     final isGuest = auth is AuthAuthenticated && auth.isGuest;
@@ -28,7 +48,7 @@ class ProjectDetailPage extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Toast listeners
-    ref.listen(projectDetailProvider(projectId), (prev, next) {
+    ref.listen(projectDetailProvider(widget.projectId), (prev, next) {
       if (next.evalSuccess && !(prev?.evalSuccess ?? false)) {
         BioSnackBar.show(context, '✓ Evaluación enviada correctamente',
             BioToastType.success);
@@ -55,8 +75,9 @@ class ProjectDetailPage extends ConsumerWidget {
         appBar: AppBar(leading: _BackButton(isDark: isDark)),
         body: BioErrorView(
           message: state.error!,
-          onRetry: () =>
-              ref.read(projectDetailProvider(projectId).notifier).reload(),
+          onRetry: () => ref
+              .read(projectDetailProvider(widget.projectId).notifier)
+              .reload(),
         ),
       );
     }
@@ -66,9 +87,9 @@ class ProjectDetailPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor:
           isDark ? AppColors.darkSurface0 : AppColors.lightBackground,
-      body: CustomScrollView(
-        slivers: [
-          // ── AppBar ────────────────────────────────────────────────────
+      body: NestedScrollView(
+        headerSliverBuilder: (headerCtx, _) => [
+          // ── AppBar + TabBar ───────────────────────────────────────────
           SliverAppBar(
             pinned: true,
             leading: _BackButton(isDark: isDark),
@@ -100,181 +121,254 @@ class ProjectDetailPage extends ConsumerWidget {
                 ),
               ),
             ],
+            bottom: TabBar(
+              controller: _tabCtrl,
+              labelStyle: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+              tabs: [
+                const Tab(text: 'Proyecto'),
+                Tab(
+                  text: project.evaluations.isNotEmpty
+                      ? 'Evaluaciones (${project.evaluations.length})'
+                      : 'Evaluaciones',
+                ),
+              ],
+            ),
           ),
+        ],
+        body: TabBarView(
+          controller: _tabCtrl,
+          children: [
+            // ── Tab 1: Proyecto ────────────────────────────────────────
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.sp16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ProjectHeader(project: project, isDark: isDark),
+                  const SizedBox(height: AppSpacing.sp20),
 
-          // ── Content ───────────────────────────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.sp16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Project Header
-                _ProjectHeader(project: project, isDark: isDark),
-                const SizedBox(height: AppSpacing.sp20),
-
-                // Description
-                _Section(
-                  title: 'Descripción',
-                  isDark: isDark,
-                  child: BioCard(
-                    child: Text(
-                      project.description,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        height: 1.5,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightMutedFg,
+                  // Description
+                  _Section(
+                    title: 'Descripción',
+                    isDark: isDark,
+                    child: BioCard(
+                      child: Text(
+                        project.description,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          height: 1.5,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightMutedFg,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.sp20),
-
-                // Tech Stack
-                if (project.techStack.isNotEmpty) ...[
-                  _Section(
-                    title: 'Stack tecnológico',
-                    isDark: isDark,
-                    child: Wrap(
-                      spacing: AppSpacing.sp8,
-                      runSpacing: AppSpacing.sp8,
-                      children: project.techStack
-                          .map((t) => BioChip(label: t))
-                          .toList(),
-                    ),
-                  ),
                   const SizedBox(height: AppSpacing.sp20),
-                ],
 
-                // Info row
-                _Section(
-                  title: 'Información',
-                  isDark: isDark,
-                  child: BioCard(
-                    child: Column(
-                      children: [
-                        _DetailRow(
-                          icon: Icons.group_outlined,
-                          label: 'Equipo',
-                          value: project.teamName,
-                          isDark: isDark,
-                        ),
-                        const SizedBox(height: AppSpacing.sp8),
-                        _DetailRow(
-                          icon: Icons.category_outlined,
-                          label: 'Categoría',
-                          value: project.category,
-                          isDark: isDark,
-                        ),
-                        const SizedBox(height: AppSpacing.sp8),
-                        _DetailRow(
-                          icon: Icons.calendar_today_outlined,
-                          label: 'Año',
-                          value: '${project.year}',
-                          isDark: isDark,
-                        ),
-                        const SizedBox(height: AppSpacing.sp8),
-                        _DetailRow(
-                          icon: Icons.star_rounded,
-                          label: 'Puntuación',
-                          value:
-                              '${project.avgScore.toStringAsFixed(1)} ⭐ (${project.totalVotes} votos)',
-                          isDark: isDark,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sp20),
-
-                // Team members
-                if (project.teamMembers.isNotEmpty) ...[
                   _Section(
-                    title: 'Equipo (${project.teamMembers.length})',
+                    title: 'Evidencias visuales',
                     isDark: isDark,
-                    child: Column(
-                      children: [
-                        ...project.teamMembers.asMap().entries.map((e) {
-                          return Column(
-                            children: [
-                              Row(
-                                children: [
-                                  UserAvatar(
-                                    name: e.value,
-                                    size: 40,
-                                    showBorder: true,
-                                  ),
-                                  const SizedBox(width: AppSpacing.sp12),
-                                  Expanded(
-                                    child: Text(
-                                      e.value,
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                        color: isDark
-                                            ? AppColors.darkTextPrimary
-                                            : AppColors.lightForeground,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (e.key < project.teamMembers.length - 1) ...[
-                                const SizedBox(height: AppSpacing.sp12),
-                                const BioDivider(),
-                                const SizedBox(height: AppSpacing.sp12),
-                              ],
-                            ],
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sp20),
-                ],
-
-                // Evaluation (docentes e invitados)
-                if (isTeacher || isGuest) ...[
-                  _Section(
-                    title: isTeacher ? 'Evaluación' : 'Sugerencia',
-                    isDark: isDark,
-                    child: _EvaluationSection(
-                        projectId: project.id, isDark: isDark),
-                  ),
-                  const SizedBox(height: AppSpacing.sp20),
-                ],
-
-                // Lista de todas las evaluaciones
-                if (project.evaluations.isNotEmpty) ...[
-                  _Section(
-                    title: 'Evaluaciones',
-                    isDark: isDark,
-                    child: _EvaluationsList(
-                      evaluations: project.evaluations,
-                      currentUserId: currentUserId,
-                      projectId: project.id,
+                    child: _MediaEvidenceCard(
+                      coverImageUrl: project.coverImageUrl,
+                      videoUrl: project.videoUrl,
                       isDark: isDark,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sp20),
-                ],
 
-                // PDF download card (siempre visible)
-                _Section(
-                  title: 'Recursos',
-                  isDark: isDark,
-                  child: _PdfDownloadCard(
-                    projectTitle: project.title,
+                  // Tech Stack
+                  if (project.techStack.isNotEmpty) ...[
+                    _Section(
+                      title: 'Stack tecnológico',
+                      isDark: isDark,
+                      child: Wrap(
+                        spacing: AppSpacing.sp8,
+                        runSpacing: AppSpacing.sp8,
+                        children: project.techStack
+                            .map((t) => BioChip(label: t))
+                            .toList(),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sp20),
+                  ],
+
+                  // Info row
+                  _Section(
+                    title: 'Información',
                     isDark: isDark,
+                    child: BioCard(
+                      child: Column(
+                        children: [
+                          _DetailRow(
+                            icon: Icons.group_outlined,
+                            label: 'Equipo',
+                            value: project.teamName,
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: AppSpacing.sp8),
+                          _DetailRow(
+                            icon: Icons.category_outlined,
+                            label: 'Categoría',
+                            value: project.category,
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: AppSpacing.sp8),
+                          _DetailRow(
+                            icon: Icons.calendar_today_outlined,
+                            label: 'Año',
+                            value: '${project.year}',
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: AppSpacing.sp8),
+                          _DetailRow(
+                            icon: Icons.star_rounded,
+                            label: 'Puntuación',
+                            value:
+                                '${project.avgScore.toStringAsFixed(1)} ⭐ (${project.totalVotes} votos)',
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.sp40),
-              ]),
+                  const SizedBox(height: AppSpacing.sp20),
+
+                  // Team members
+                  if (project.teamMembers.isNotEmpty) ...[
+                    _Section(
+                      title: 'Equipo (${project.teamMembers.length})',
+                      isDark: isDark,
+                      child: Column(
+                        children: [
+                          ...project.teamMembers.asMap().entries.map((e) {
+                            return Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    UserAvatar(
+                                      name: e.value,
+                                      size: 40,
+                                      showBorder: true,
+                                    ),
+                                    const SizedBox(width: AppSpacing.sp12),
+                                    Expanded(
+                                      child: Text(
+                                        e.value,
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark
+                                              ? AppColors.darkTextPrimary
+                                              : AppColors.lightForeground,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (e.key < project.teamMembers.length - 1) ...[
+                                  const SizedBox(height: AppSpacing.sp12),
+                                  const BioDivider(),
+                                  const SizedBox(height: AppSpacing.sp12),
+                                ],
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sp20),
+                  ],
+
+                  // PDF download card
+                  _Section(
+                    title: 'Recursos',
+                    isDark: isDark,
+                    child: _PdfDownloadCard(
+                      projectTitle: project.title,
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sp40),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // ── Tab 2: Evaluaciones ────────────────────────────────────
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.sp16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Evaluation form (docentes e invitados)
+                  if (isTeacher || isGuest) ...[
+                    _Section(
+                      title: isTeacher ? 'Evaluación' : 'Sugerencia',
+                      isDark: isDark,
+                      child: RubricEvaluationSection(
+                          projectId: project.id, isDark: isDark),
+                    ),
+                    const SizedBox(height: AppSpacing.sp20),
+                  ],
+
+                  // Lista de evaluaciones
+                  if (project.evaluations.isNotEmpty)
+                    _Section(
+                      title: 'Evaluaciones (${project.evaluations.length})',
+                      isDark: isDark,
+                      child: _EvaluationsList(
+                        evaluations: project.evaluations,
+                        currentUserId: currentUserId,
+                        projectId: project.id,
+                        isDark: isDark,
+                      ),
+                    )
+                  else
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.sp40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.rate_review_outlined,
+                              size: 48,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightMutedFg,
+                            ),
+                            const SizedBox(height: AppSpacing.sp12),
+                            Text(
+                              'Sin evaluaciones aún',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 15,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightMutedFg,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: AppSpacing.sp40),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -485,85 +579,217 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-// ── Already Evaluated Banner ──────────────────────────────────────────────
+class _MediaEvidenceCard extends StatelessWidget {
+  const _MediaEvidenceCard({
+    required this.coverImageUrl,
+    required this.videoUrl,
+    required this.isDark,
+  });
 
-class _AlreadyEvaluatedBanner extends StatelessWidget {
-  const _AlreadyEvaluatedBanner({required this.eval, required this.isDark});
-  final EvaluationReadModel eval;
+  final String? coverImageUrl;
+  final String? videoUrl;
   final bool isDark;
+
+  Future<void> _openVideo(BuildContext context) async {
+    final raw = videoUrl;
+    if (raw == null || raw.trim().isEmpty) return;
+
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null) {
+      BioSnackBar.show(
+        context,
+        'URL de video invalida.',
+        BioToastType.warning,
+      );
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      BioSnackBar.show(
+        context,
+        'No se pudo abrir el video.',
+        BioToastType.error,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sp12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [AppColors.badgeCompletoBg, AppColors.darkSurface2]
-              : [const Color(0xFFE8F5E9), const Color(0xFFF1F8E9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkSuccess.withAlpha(80)
-              : AppColors.success.withAlpha(120),
-          width: 1,
-        ),
-      ),
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+    final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final accent = isDark ? AppColors.darkAccent : AppColors.lightPrimary;
+
+    return BioCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.check_circle_rounded,
-                size: 16,
-                color: AppColors.darkSuccess,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Ya evaluaste este proyecto',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.darkSuccess,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sp8),
-          // Stars row
-          Row(
-            children: List.generate(5, (i) {
-              return Icon(
-                i < eval.stars
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                size: 18,
-                color: Colors.amber,
-              );
-            }),
-          ),
-          if (eval.feedback != null && eval.feedback!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sp6),
-            Text(
-              '"${eval.feedback}"',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                height: 1.4,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            'Imagen del proyecto',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: textPrimary,
             ),
-          ],
+          ),
+          const SizedBox(height: AppSpacing.sp10),
+          GestureDetector(
+            onTap: coverImageUrl == null
+                ? null
+                : () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (_) => Dialog.fullscreen(
+                        child: Stack(
+                          children: [
+                            ColoredBox(
+                              color: Colors.black,
+                              child: Center(
+                                child: InteractiveViewer(
+                                  child: CachedNetworkImage(
+                                    imageUrl: coverImageUrl!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 18,
+                              right: 12,
+                              child: IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: coverImageUrl == null
+                    ? Container(
+                        color: isDark
+                            ? AppColors.darkSurface2
+                            : AppColors.lightMuted,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              color: textSecondary,
+                              size: 30,
+                            ),
+                            const SizedBox(height: AppSpacing.sp8),
+                            Text(
+                              'Sin imagen por ahora',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: coverImageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: isDark
+                              ? AppColors.darkSurface2
+                              : AppColors.lightMuted,
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: isDark
+                              ? AppColors.darkSurface2
+                              : AppColors.lightMuted,
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: textSecondary,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sp14),
+          Text(
+            'Video de demostracion',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sp10),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sp12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface2 : AppColors.lightMuted,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withAlpha(28),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Icon(
+                    Icons.play_circle_fill_rounded,
+                    color: accent,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sp10),
+                Expanded(
+                  child: Text(
+                    (videoUrl != null && videoUrl!.trim().isNotEmpty)
+                        ? videoUrl!
+                        : 'Sin video por ahora',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sp8),
+                TextButton(
+                  onPressed: (videoUrl != null && videoUrl!.trim().isNotEmpty)
+                      ? () => _openVideo(context)
+                      : null,
+                  child: Text(
+                    'Abrir',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -685,178 +911,7 @@ class _PdfDownloadCardState extends State<_PdfDownloadCard> {
   }
 }
 
-// ── Evaluation Section ─────────────────────────────────────────────────────
-
-class _EvaluationSection extends ConsumerStatefulWidget {
-  const _EvaluationSection({required this.projectId, required this.isDark});
-  final String projectId;
-  final bool isDark;
-
-  @override
-  ConsumerState<_EvaluationSection> createState() => _EvaluationSectionState();
-}
-
-class _EvaluationSectionState extends ConsumerState<_EvaluationSection> {
-  int _stars = 0;
-  final _feedbackCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _feedbackCtrl.dispose();
-    super.dispose();
-  }
-
-  void _showConfirmDialog(ProjectDetailReadModel project) {
-    if (_stars == 0) {
-      BioSnackBar.show(
-          context, 'Selecciona al menos 1 estrella', BioToastType.warning);
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmar evaluación'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              project.title,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _stars,
-                (_) => const Icon(Icons.star_rounded,
-                    color: Colors.amber, size: 20),
-              ),
-            ),
-            if (_feedbackCtrl.text.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                '"${_feedbackCtrl.text}"',
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 13),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(
-                color: widget.isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _submit();
-            },
-            child: const Text(
-              'Enviar',
-              style: TextStyle(
-                color: AppColors.darkPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    HapticFeedback.selectionClick();
-    await ref
-        .read(projectDetailProvider(widget.projectId).notifier)
-        .submitEvaluation(
-          SubmitEvaluationCommand(
-            projectId: widget.projectId,
-            stars: _stars,
-            feedback: _feedbackCtrl.text.isEmpty ? null : _feedbackCtrl.text,
-          ),
-        );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(projectDetailProvider(widget.projectId));
-    final prev = state.project?.myEvaluation;
-
-    return BioCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Banner si ya evaluó ────────────────────────────────────
-          if (prev != null) ...[
-            _AlreadyEvaluatedBanner(eval: prev, isDark: widget.isDark),
-            const SizedBox(height: AppSpacing.sp16),
-            Divider(
-              color:
-                  widget.isDark ? AppColors.darkBorder : AppColors.lightBorder,
-              height: 1,
-            ),
-            const SizedBox(height: AppSpacing.sp16),
-          ],
-          Text(
-            prev != null ? 'Modificar tu evaluación' : 'Califica este proyecto',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: widget.isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightForeground,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sp12),
-          RatingBar.builder(
-            initialRating: (prev?.stars ?? _stars).toDouble(),
-            minRating: 1,
-            itemCount: 5,
-            itemSize: 32,
-            itemBuilder: (_, __) =>
-                const Icon(Icons.star_rounded, color: Colors.amber),
-            onRatingUpdate: (r) => setState(() => _stars = r.toInt()),
-          ),
-          const SizedBox(height: AppSpacing.sp12),
-          TextField(
-            controller: _feedbackCtrl,
-            maxLines: 3,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              color: widget.isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightForeground,
-            ),
-            decoration: const InputDecoration(
-              hintText: 'Retroalimentación (opcional)...',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sp16),
-          BioButton(
-            label: state.isSubmitting ? 'Enviando...' : 'Enviar evaluación',
-            isLoading: state.isSubmitting,
-            onPressed: state.isSubmitting
-                ? null
-                : () => _showConfirmDialog(state.project!),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ── Evaluation Section has been moved to features/project_detail/widgets/rubric_evaluation_section.dart ──
 
 // ── Evaluaciones List ──────────────────────────────────────────────────────
 
@@ -976,7 +1031,7 @@ class _EvalCard extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: List.generate(5, (i) {
                   return Icon(
-                    i < eval.stars
+                    i < (eval.weightedTotalScore / 20).round()
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
                     size: 14,
@@ -1007,19 +1062,7 @@ class _EvalCard extends ConsumerWidget {
               ],
             ],
           ),
-          // Feedback
-          if (eval.feedback != null && eval.feedback!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              '"${eval.feedback}"',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: textSecondary,
-              ),
-            ),
-          ],
+          // Feedback removed
           // Visibilidad tag (solo para el autor cuando es privada)
           if (isOwn && !eval.esPublico) ...[
             const SizedBox(height: 6),

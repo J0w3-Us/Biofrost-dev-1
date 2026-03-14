@@ -62,140 +62,166 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         bottom: false,
         child: RefreshIndicator(
           onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
-        child: CustomScrollView(
-          slivers: [
-            // ── Header ─────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: _DashboardHeader(
-                teacherName: teacherName,
-                isDark: isDark,
+          child: CustomScrollView(
+            slivers: [
+              // ── Header ─────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _DashboardHeader(
+                  teacherName: teacherName,
+                  isDark: isDark,
+                ),
               ),
-            ),
 
-            // ── Stat Cards ─────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: dash.isLoading
-                    ? const SizedBox(
-                        height: 120,
-                        child: Center(child: CircularProgressIndicator()),
-                      ) // Added missing ')' here
-                    : Column(
+              // ── Stat Cards ─────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: dash.isLoading
+                      ? const SizedBox(
+                          height: 72,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : Row(
                           children: [
-                            // Top row: Total spans full width
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    label: 'Total de Proyectos',
-                                    value: '${dash.total}',
-                                    icon: Icons.folder_outlined,
-                                    color: const Color(0xFF3B82F6), // Blue
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ],
+                            Expanded(
+                              child: _StatChip(
+                                label: 'Total',
+                                value: '${dash.total}',
+                                icon: Icons.folder_outlined,
+                                color: AppColors.lightOlive,
+                                isDark: isDark,
+                              ),
                             ),
-                            const SizedBox(height: 12),
-                            // Bottom row: Pendientes and Aprobados
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    label: 'Pendientes',
-                                    value: '${dash.pendientes}',
-                                    icon: Icons.access_time_rounded,
-                                    color: const Color(0xFFF59E0B), // Amber
-                                    isDark: isDark,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _StatCard(
-                                    label: 'Aprobados',
-                                    value: '${dash.aprobados}',
-                                    icon: Icons.check_circle_outline_rounded,
-                                    color: const Color(0xFF10B981), // Emerald
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _StatChip(
+                                label: 'Pendientes',
+                                value: '${dash.pendientes}',
+                                icon: Icons.access_time_rounded,
+                                color: AppColors.lightOlive,
+                                isDark: isDark,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _StatChip(
+                                label: 'Aprobados',
+                                value: '${dash.aprobados}',
+                                icon: Icons.check_circle_outline_rounded,
+                                color: AppColors.lightPrimary,
+                                isDark: isDark,
+                              ),
                             ),
                           ],
                         ),
-              ),
-            ),
-
-            // ── Buscador ───────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar proyecto o alumno...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    suffixIcon: _query.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _query = '');
-                            },
-                          )
-                        : null,
-                  ),
                 ),
               ),
-            ),
 
-            // ── Lista de proyectos ─────────────────────────────────────
-            if (dash.isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (dash.error != null)
-              SliverFillRemaining(
-                child: _ErrorView(
-                  message: dash.error!,
-                  onRetry: () => ref.read(dashboardProvider.notifier).refresh(),
-                ),
-              )
-            else if (filtered.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: dash.projects.isEmpty
-                    ? _HeroBanner(isDark: isDark)
-                    : BioEmptyState(
-                        title: 'Sin resultados',
-                        subtitle: 'No se encontraron proyectos para "$_query".',
-                        icon: Icons.search_off_rounded,
-                        isDark: isDark,
+              // ── Buscador ───────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar proyecto o alumno...',
+                      filled: true,
+                      fillColor:
+                          isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        size: 18,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightMutedFg,
                       ),
-              )
-            else
-              SliverPadding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _ProjectRow(
-                      project: filtered[i],
-                      isDark: isDark,
-                      onTap: () => context.push('/project/${filtered[i].id}'),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        borderSide: const BorderSide(
+                          color: AppColors.lightPrimary,
+                          width: 1.2,
+                        ),
+                      ),
+                      suffixIcon: _query.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightMutedFg,
+                              ),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _query = '');
+                              },
+                            )
+                          : null,
                     ),
-                    childCount: filtered.length,
                   ),
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
-        ),
+              // ── Lista de proyectos ─────────────────────────────────────
+              if (dash.isLoading)
+                const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (dash.error != null)
+                SliverFillRemaining(
+                  child: _ErrorView(
+                    message: dash.error!,
+                    onRetry: () =>
+                        ref.read(dashboardProvider.notifier).refresh(),
+                  ),
+                )
+              else if (filtered.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: dash.projects.isEmpty
+                      ? _HeroBanner(
+                          isDark: isDark,
+                          role:
+                              auth is AuthAuthenticated ? auth.role : 'Docente',
+                        )
+                      : BioEmptyState(
+                          title: 'Sin resultados',
+                          subtitle:
+                              'No se encontraron proyectos para "$_query".',
+                          icon: Icons.search_off_rounded,
+                          isDark: isDark,
+                        ),
+                )
+              else
+                SliverPadding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => _ProjectRow(
+                        project: filtered[i],
+                        isDark: isDark,
+                        onTap: () => context.push('/project/${filtered[i].id}'),
+                      ),
+                      childCount: filtered.length,
+                    ),
+                  ),
+                ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
         ),
       ),
     );
@@ -212,65 +238,47 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF0D1B3E), // deep navy
-              Color(0xFF1A2B5A), // mid blue
-              Color(0xFF0A1628), // dark ink
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Hola, $teacherName',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: textPrimary,
+            ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1A2B5A).withAlpha(100),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
+          const SizedBox(height: 4),
+          Text(
+            'Tus proyectos asignados',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: textSecondary,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Hola, $teacherName 👋',
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Viendo tus proyectos asignados',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Colors.white.withAlpha(180),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Stat Card ── Aurora Pill Button (identidad Biofrost) ────────────────
+// ── Stat Chip ─────────────────────────────────────────────────────────────
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+class _StatChip extends StatelessWidget {
+  const _StatChip({
     required this.label,
     required this.value,
     required this.icon,
@@ -286,221 +294,92 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF161618) : Colors.white;
-    final borderColor = isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10);
-    
+    final bgColor = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
+
     return Container(
-      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 40 : 10),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withAlpha(isDark ? 26 : 10),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            // Inner top highlight (simulating glassmorphism specular reflection)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 40,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withAlpha(isDark ? 15 : 40),
-                      Colors.white.withAlpha(0),
-                    ],
-                  ),
-                ),
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightForeground,
             ),
-            
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Icon with localized glow
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(isDark ? 30 : 20),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color.withAlpha(isDark ? 60 : 40), width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withAlpha(isDark ? 40 : 20),
-                          blurRadius: 12,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(icon, color: color, size: 20),
-                  ),
-                  const SizedBox(height: 16),
-                  // Value (Large number)
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Label
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color:
+                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Hero Banner ── Estado vacío, editorial y elegante ───────────────────
+// ── Hero Banner ── Estado vacío, por rol ────────────────────────────────
 
 class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.isDark});
+  const _HeroBanner({required this.isDark, required this.role});
   final bool isDark;
+  final String role;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF3B82F6).withAlpha(isDark ? 80 : 40),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFF06B6D4), // Cyan 500
-                Color(0xFF3B82F6), // Blue 500
-                Color(0xFF4F46E5), // Indigo 600
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Icon circle — white border, translucent center
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withAlpha(200), width: 1.5),
-                          color: Colors.white.withAlpha(20),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.rocket_launch_rounded,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Heading
-                      const Text(
-                        'Todo listo, profesor',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.8,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      // Body
-                      Text(
-                        'Cuando te asignen un proyecto para evaluar,\naparecerá justo aquí.',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          height: 1.5,
-                          color: Colors.white.withAlpha(230),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
+    late String title;
+    late String subtitle;
+    late IconData icon;
 
-                // ── Specular highlight (top curve) ──
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 24,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withAlpha(50),
-                          Colors.white.withAlpha(0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    if (role == 'Alumno') {
+      title = 'Sin proyectos aún';
+      subtitle = 'Crea un proyecto nuevo para empezar.';
+      icon = Icons.add_circle_outline_rounded;
+    } else if (role == 'Invitado') {
+      title = 'Modo invitado';
+      subtitle =
+          'Estás explorando la plataforma.\nCrea una cuenta para registrar proyectos.';
+      icon = Icons.person_outline_rounded;
+    } else {
+      title = 'Todo listo';
+      subtitle = 'Cuando te asignen un proyecto para evaluar, aparecerá aquí.';
+      icon = Icons.inbox_rounded;
+    }
+
+    return BioEmptyState(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      isDark: isDark,
     );
   }
 }
-
 
 // ── Project Row ────────────────────────────────────────────────────────────
 
@@ -516,18 +395,17 @@ class _ProjectRow extends StatelessWidget {
   final VoidCallback onTap;
 
   Color get _statusColor {
-    if (project.pendienteDeEvaluar) return const Color(0xFFF59E0B);
+    if (project.pendienteDeEvaluar) return AppColors.lightOlive;
     if (project.aprobado) return AppColors.success;
-    if (project.calificacion != null) return const Color(0xFFEF4444);
+    if (project.calificacion != null) return AppColors.error.withAlpha(180);
     return AppColors.darkTextSecondary;
   }
 
   String get _statusLabel {
     if (project.pendienteDeEvaluar) return 'Pendiente';
-    if (project.aprobado)
-      return '✓ ${project.calificacion!.toStringAsFixed(0)}';
+    if (project.aprobado) return '${project.calificacion!.toStringAsFixed(0)}';
     if (project.calificacion != null) {
-      return '✗ ${project.calificacion!.toStringAsFixed(0)}';
+      return '${project.calificacion!.toStringAsFixed(0)}';
     }
     if (!project.esPublico) return 'Sin publicar';
     return '—';
@@ -535,8 +413,7 @@ class _ProjectRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? AppColors.darkSurface1 : Colors.white;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final bgColor = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final textSecondary =
@@ -550,7 +427,13 @@ class _ProjectRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 26 : 10),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -624,7 +507,6 @@ class _ProjectRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _statusColor.withAlpha(25),
                 borderRadius: BorderRadius.circular(AppRadius.full),
-                border: Border.all(color: _statusColor.withAlpha(80)),
               ),
               child: Text(
                 _statusLabel,

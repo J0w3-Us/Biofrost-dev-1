@@ -1,8 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <application
         android:label="Biofrost"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -30,11 +32,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- Deshabilita Impeller (renderer Vulkan) en dispositivos con drivers
-             Adreno/GPU incompatibles que generan errores qdgralloc/AHardwareBuffer -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

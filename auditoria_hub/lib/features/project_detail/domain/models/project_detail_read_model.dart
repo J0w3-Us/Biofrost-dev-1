@@ -120,42 +120,143 @@ class ProjectDetailReadModel extends Equatable {
   List<Object?> get props => [id, avgScore, totalVotes, myEvaluation];
 }
 
+enum EvaluationStatus { draft, completed }
+
+class CriterionReadModel extends Equatable {
+  const CriterionReadModel({
+    required this.id,
+    required this.name,
+    required this.weight,
+    required this.score,
+    this.comment,
+  });
+
+  final String id;
+  final String name;
+  final double weight;
+  final double score;
+  final String? comment;
+
+  factory CriterionReadModel.fromJson(Map<String, dynamic> json) {
+    return CriterionReadModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      weight: (json['weight'] as num?)?.toDouble() ?? 0.0,
+      score: (json['score'] as num?)?.toDouble() ?? 0.0,
+      comment: (json['comment'] ?? json['comentario']) as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'weight': weight,
+      'score': score,
+      if (comment != null && comment!.trim().isNotEmpty) 'comment': comment,
+    };
+  }
+
+  CriterionReadModel copyWith({
+    String? id,
+    String? name,
+    double? weight,
+    double? score,
+    String? comment,
+  }) {
+    return CriterionReadModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      weight: weight ?? this.weight,
+      score: score ?? this.score,
+      comment: comment ?? this.comment,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, weight, score, comment];
+}
+
 class EvaluationReadModel extends Equatable {
   const EvaluationReadModel({
     required this.id,
     required this.evaluatorId,
     required this.evaluatorName,
-    required this.stars,
+    required this.criteria,
+    required this.weightedTotalScore,
+    required this.status,
     required this.esPublico,
     required this.tipo,
-    this.feedback,
     required this.createdAt,
   });
 
   final String id;
   final String evaluatorId;
   final String evaluatorName;
-  final int stars;
+  final List<CriterionReadModel> criteria;
+  final double weightedTotalScore;
+  final EvaluationStatus status;
   final bool esPublico;
   final String tipo;
-  final String? feedback;
   final DateTime createdAt;
 
   factory EvaluationReadModel.fromJson(Map<String, dynamic> json) {
-    // calificacion: 0-100 → convertir a estrellas 0-5
-    final cal = (json['calificacion'] as num?)?.toInt();
+    final criteriaJson = json['criteria'] as List? ?? [];
+    final weighted =
+        (json['weightedTotalScore'] ?? json['calificacion'] ?? 0) as num;
+
+    final criteria = criteriaJson.isNotEmpty
+        ? criteriaJson
+            .map((c) => CriterionReadModel.fromJson(c as Map<String, dynamic>))
+            .toList()
+        : [
+            // Compatibilidad con payload legado de calificacion plana.
+            CriterionReadModel(
+              id: 'legacy_total',
+              name: 'Evaluación general',
+              weight: 1,
+              score: (weighted.toDouble() / 20).clamp(0, 5),
+            ),
+          ];
+
+    final statusStr = json['status'] as String?;
+    final status = switch (statusStr) {
+      'completed' => EvaluationStatus.completed,
+      'draft' => EvaluationStatus.draft,
+      _ => weighted.toDouble() > 0
+          ? EvaluationStatus.completed
+          : EvaluationStatus.draft,
+    };
+
     return EvaluationReadModel(
       id: json['id'] as String,
       evaluatorId: json['docenteId'] as String? ?? '',
       evaluatorName: json['docenteNombre'] as String? ?? 'Anónimo',
-      stars: cal != null ? (cal / 20).round().clamp(0, 5) : 0,
+      criteria: criteria,
+      weightedTotalScore: weighted.toDouble(),
+      status: status,
       esPublico: json['esPublico'] as bool? ?? false,
-      tipo: json['tipo'] as String? ?? 'sugerencia',
-      feedback: json['contenido'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      tipo: json['tipo'] as String? ?? 'evaluacion',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'docenteId': evaluatorId,
+      'docenteNombre': evaluatorName,
+      'criteria': criteria.map((c) => c.toMap()).toList(),
+      'weightedTotalScore': weightedTotalScore,
+      'status': status.name,
+      'esPublico': esPublico,
+      'tipo': tipo,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
   @override
-  List<Object?> get props => [id, stars, createdAt, esPublico];
+  List<Object?> get props =>
+      [id, criteria, weightedTotalScore, status, createdAt, esPublico];
 }

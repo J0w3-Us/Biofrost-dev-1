@@ -12,7 +12,9 @@ class NotificationService {
   NotificationService._();
   static final instance = NotificationService._();
 
-  final _messaging = FirebaseMessaging.instance;
+  // Paso 2: inicialización diferida — FirebaseMessaging.instance no se accede
+  // hasta que initialize() es llamado, garantizando que Firebase ya esté listo.
+  late final FirebaseMessaging _messaging;
   final _localNotifications = FlutterLocalNotificationsPlugin();
   final _logger = Logger();
 
@@ -20,6 +22,8 @@ class NotificationService {
   static const _channelName = 'Auditoría Hub';
 
   Future<void> initialize() async {
+    // Asignar aquí garantiza que Firebase ya fue inicializado por main()
+    _messaging = FirebaseMessaging.instance;
     try {
       // Permisos — puede fallar si el dispositivo no tiene GMS
       await _messaging.requestPermission(

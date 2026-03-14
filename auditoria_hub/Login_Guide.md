@@ -211,7 +211,3 @@ rol
 Si isFirstLogin === true → muestra formulario de perfil y llama a /api/auth/register
 Nunca escribas directo a Firestore desde el app — todo pasa por el backend
 Documento generado desde el análisis del proyecto IntegradorHub — Marzo 2026
-
-
-Comment
-⌥⌘M
