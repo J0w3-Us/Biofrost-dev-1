@@ -87,13 +87,13 @@ class _SplashPageState extends ConsumerState<SplashPage>
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: AppColors.lightCard.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(AppRadius.xl),
                     ),
                     child: const Icon(
                       Icons.assignment_turned_in_rounded,
                       size: 40,
-                      color: Colors.white,
+                      color: AppColors.lightCard,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -104,7 +104,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                       fontFamily: 'Inter',
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppColors.lightCard,
                       letterSpacing: -1.0,
                     ),
                   ),
@@ -116,7 +116,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                       fontFamily: 'Inter',
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: Colors.white.withOpacity(0.80),
+                      color: AppColors.lightCard.withOpacity(0.80),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -127,7 +127,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.7),
+                        AppColors.lightCard.withOpacity(0.7),
                       ),
                     ),
                   ),

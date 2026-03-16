@@ -2,13 +2,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ui/feedback/haptic_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/form_label.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../domain/commands/login_command.dart';
 import '../domain/models/auth_state.dart';
+import '../presentation/controllers/complete_profile_controller.dart';
 import '../providers/auth_provider.dart';
 
 class CompleteProfilePage extends ConsumerStatefulWidget {
@@ -47,6 +51,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   // Step 3 check icon scale
   late AnimationController _checkCtrl;
   late Animation<double> _checkScale;
+  late CompleteProfileController _completeProfileController;
 
   static const _staggerCount = 5;
 
@@ -80,6 +85,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   @override
   void initState() {
     super.initState();
+    _completeProfileController = CompleteProfileController(ref);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final s = ref.read(authStateProvider);
       if (s is AuthAuthenticated) {
@@ -124,10 +130,12 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   }
 
   void _advanceStep(int next) {
+    HapticFeedback.lightImpact();
     setState(() => _step = next);
     _staggerCtrl.reset();
     _staggerCtrl.forward();
     if (next == 3) {
+      HapticFeedback.selectionClick();
       _checkCtrl.reset();
       _checkCtrl.forward();
     }
@@ -184,6 +192,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
   }
 
   Future<void> _submitProfile() async {
+    await HapticService.lightImpact();
     FocusScope.of(context).unfocus();
     setState(() {
       _isLoading = true;
@@ -195,7 +204,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
     });
 
     try {
-      final cmd = CompleteProfileCommand(
+      final authState = await _completeProfileController.completeProfile(
         firebaseUid: _firebaseUid,
         nombre: _nameCtrl.text.trim(),
         apellidoPaterno: _apellidoPaternoCtrl.text.trim().isNotEmpty
@@ -206,7 +215,6 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
             : null,
         email: _email,
         rol: _detectedRole,
-        profesion: null,
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
             : null,
@@ -222,8 +230,6 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
               ]
             : const [],
       );
-
-      await ref.read(authStateProvider.notifier).completeProfile(cmd);
       if (!mounted) return;
       _wakeUpTimer?.cancel();
       setState(() {
@@ -231,12 +237,12 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
         _showWakeUp = false;
       });
 
-      final authState = ref.read(authStateProvider);
       if (authState is AuthError) {
         setState(() => _errorMsg = authState.message);
         return;
       }
 
+      await HapticService.success();
       _advanceStep(3);
     } catch (e) {
       if (!mounted) return;
@@ -300,6 +306,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
               // ── Contenido del step actual ─────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
@@ -464,31 +473,33 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
           4,
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: () => _advanceStep(1),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Comenzar',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
+            child: PressScale(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: AppColors.lightCard,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full)),
+                ),
+                onPressed: () => _advanceStep(1),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Comenzar',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
           ),
@@ -503,8 +514,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
-    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
-    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
+    final primaryBtn = isDark ? AppColors.darkPrimary : AppColors.lightForeground;
+    final primaryBtnText =
+      isDark ? AppColors.darkTextInverse : AppColors.lightCard;
 
     return Form(
       key: _formKey,
@@ -554,13 +566,11 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                         textCapitalization: TextCapitalization.words,
                         style: TextStyle(
                             fontFamily: 'Inter',
-                            fontSize: 14,
+                            fontSize: 15,
                             color: textPrimary),
                         decoration: const InputDecoration(
                           hintText: 'Paterno',
-                          prefixIcon: Icon(Icons.person_2_outlined, size: 16),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 14),
+                          prefixIcon: Icon(Icons.person_2_outlined, size: 18),
                         ),
                       ),
                     ],
@@ -579,13 +589,11 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                         textCapitalization: TextCapitalization.words,
                         style: TextStyle(
                             fontFamily: 'Inter',
-                            fontSize: 14,
+                            fontSize: 15,
                             color: textPrimary),
                         decoration: const InputDecoration(
                           hintText: 'Materno',
-                          prefixIcon: Icon(Icons.person_3_outlined, size: 16),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 14),
+                          prefixIcon: Icon(Icons.person_3_outlined, size: 18),
                         ),
                       ),
                     ],
@@ -642,43 +650,46 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
             4,
             SizedBox(
               height: 54,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBtn,
-                  foregroundColor: primaryBtnText,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.full)),
-                ),
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        if (!_formKey.currentState!.validate()) return;
-                        FocusScope.of(context).unfocus();
-                        if (_hasAcademicStep) {
-                          ref.read(catalogProvider.notifier).loadCarreras();
-                          _advanceStep(2);
-                        } else {
-                          _submitProfile();
-                        }
-                      },
-                child: _isLoading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: primaryBtnText),
-                      )
-                    : Text(
-                        _hasAcademicStep ? 'Continuar' : 'Finalizar',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: primaryBtnText,
+              child: PressScale(
+                enabled: !_isLoading,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBtn,
+                    foregroundColor: primaryBtnText,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full)),
+                  ),
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          if (!_formKey.currentState!.validate()) return;
+                          FocusScope.of(context).unfocus();
+                          if (_hasAcademicStep) {
+                            ref.read(catalogProvider.notifier).loadCarreras();
+                            _advanceStep(2);
+                          } else {
+                            _submitProfile();
+                          }
+                        },
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: primaryBtnText),
+                        )
+                      : Text(
+                          _hasAcademicStep ? 'Continuar' : 'Finalizar',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: primaryBtnText,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
           ),
@@ -695,8 +706,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
-    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
+    final primaryBtn = isDark ? AppColors.darkPrimary : AppColors.lightForeground;
+    final primaryBtnText =
+      isDark ? AppColors.darkTextInverse : AppColors.lightCard;
 
     final catalog = ref.watch(catalogProvider);
     final carreras = catalog.carreras;
@@ -877,7 +889,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
                                   : AppColors.lightBorder),
                         ),
                         backgroundColor:
-                            isDark ? AppColors.darkSurface1 : Colors.white,
+                          isDark ? AppColors.darkSurface1 : AppColors.lightCard,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadius.md)),
                         onSelected: (checked) => setState(() {
@@ -912,32 +924,36 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
           4,
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBtn,
-                foregroundColor: primaryBtnText,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: _isLoading || loadingCatalogs ? null : _submitProfile,
-              child: _isLoading
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: primaryBtnText),
-                    )
-                  : Text(
-                      'Finalizar',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: primaryBtnText,
+            child: PressScale(
+              enabled: !_isLoading && !loadingCatalogs,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBtn,
+                  foregroundColor: primaryBtnText,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full)),
+                ),
+                onPressed:
+                    _isLoading || loadingCatalogs ? null : _submitProfile,
+                child: _isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: primaryBtnText),
+                      )
+                    : Text(
+                        'Finalizar',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: primaryBtnText,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),
@@ -1016,31 +1032,36 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage>
           3,
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: () => context.go('/showcase'),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Ir a la plataforma',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
+            child: PressScale(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: AppColors.lightCard,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full)),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.go('/showcase');
+                },
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Ir a la plataforma',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1152,7 +1173,7 @@ class _SelectorRow extends StatelessWidget {
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final bg = isDark ? AppColors.darkSurface1 : Colors.white;
+    final bg = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
 
     return GestureDetector(
       onTap: onTap,
@@ -1215,7 +1236,7 @@ class _SelectorSheet<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = isDark ? AppColors.darkAccent : AppColors.lightAccent;
-    final surface = isDark ? AppColors.darkSurface1 : Colors.white;
+    final surface = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final mutedColor =

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../domain/commands/submit_evaluation_command.dart';
 import '../domain/models/project_detail_read_model.dart';
@@ -49,6 +50,7 @@ class _RubricEvaluationSectionState
   }
 
   void _onSaveDraft(EvaluationEngineState engineState) {
+    HapticFeedback.lightImpact();
     if (!engineState.hasAnyScore) {
       BioSnackBar.show(
         context,
@@ -65,6 +67,7 @@ class _RubricEvaluationSectionState
   }
 
   void _onSubmit(EvaluationEngineState engineState) {
+    HapticFeedback.lightImpact();
     if (!engineState.isComplete) {
       BioSnackBar.show(
         context,
@@ -82,6 +85,7 @@ class _RubricEvaluationSectionState
         isDark: widget.isDark,
         weightedScore: engineState.weightedTotalScore,
         onConfirm: () {
+          HapticFeedback.selectionClick();
           Navigator.pop(context);
           ref
               .read(evaluationEngineProvider(widget.projectId).notifier)
@@ -173,23 +177,29 @@ class _RubricEvaluationSectionState
           Row(
             children: [
               Expanded(
-                child: BioButton(
-                  onPressed: submitState.isSubmitting
-                      ? null
-                      : () => _onSaveDraft(engineState),
-                  label: 'Guardar borrador',
-                  variant: BioButtonVariant.secondary,
+                child: PressScale(
+                  enabled: !submitState.isSubmitting,
+                  child: BioButton(
+                    onPressed: submitState.isSubmitting
+                        ? null
+                        : () => _onSaveDraft(engineState),
+                    label: 'Guardar borrador',
+                    variant: BioButtonVariant.secondary,
+                  ),
                 ),
               ),
               const SizedBox(width: AppSpacing.sp12),
               Expanded(
-                child: BioButton(
-                  onPressed: submitState.isSubmitting
-                      ? null
-                      : () => _onSubmit(engineState),
-                  label: 'Enviar evaluacion',
-                  isLoading: submitState.isSubmitting,
-                  variant: BioButtonVariant.primary,
+                child: PressScale(
+                  enabled: !submitState.isSubmitting,
+                  child: BioButton(
+                    onPressed: submitState.isSubmitting
+                        ? null
+                        : () => _onSubmit(engineState),
+                    label: 'Enviar evaluacion',
+                    isLoading: submitState.isSubmitting,
+                    variant: BioButtonVariant.primary,
+                  ),
                 ),
               ),
             ],
@@ -494,18 +504,28 @@ class _VoteConfirmSheet extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: BioButton(
-                  onPressed: () => Navigator.pop(context),
-                  label: 'Cancelar',
-                  variant: BioButtonVariant.secondary,
+                child: PressScale(
+                  child: BioButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context);
+                    },
+                    label: 'Cancelar',
+                    variant: BioButtonVariant.secondary,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: BioButton(
-                  onPressed: onConfirm,
-                  label: 'Enviar',
-                  variant: BioButtonVariant.primary,
+                child: PressScale(
+                  child: BioButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      onConfirm();
+                    },
+                    label: 'Enviar',
+                    variant: BioButtonVariant.primary,
+                  ),
                 ),
               ),
             ],

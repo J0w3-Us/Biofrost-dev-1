@@ -18,7 +18,7 @@ class BioEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? AppColors.darkSurface1 : Colors.white;
+    final bgColor = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
     final iconColor = isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
     final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final subtitleColor = isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;

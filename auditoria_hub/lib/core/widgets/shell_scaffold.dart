@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/domain/models/auth_state.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../providers/connectivity_provider.dart';
+import '../providers/nav_bar_visibility_provider.dart';
 import '../theme/app_theme.dart';
+import 'custom_animated_bottom_nav_bar.dart';
 import 'ui_kit.dart';
 
 class ShellScaffold extends ConsumerWidget {
@@ -69,22 +71,17 @@ class ShellScaffold extends ConsumerWidget {
 
     // ── Nav bar palette ──────────────────────────────────────────────────────
     // Solid colors — zero blur / glassmorphism (performance constraint)
-    final navBgColor = isDark ? AppColors.darkSurface1 : Colors.white;
-    final shadowColor = Colors.black.withAlpha(isDark ? 60 : 24);
-    final borderColor = isDark
-        ? AppColors.darkBorder.withAlpha(100)
-        : AppColors.lightBorder.withAlpha(80);
-
-    // Ícono inactivo
-    const inactiveColor = AppColors.darkTextSecondary;
-
-    // Active pill — solid tint, no blur
-    final activePillColor = isDark
-        ? AppColors.lightPrimary.withAlpha(30)
-        : AppColors.lightPrimary.withAlpha(18);
-    final activeIconColor = isDark ? Colors.white : AppColors.lightPrimary;
+    final navBgColor = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
+    final baseAccent = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
+    final activeCircleColor = Color.lerp(navBgColor, baseAccent, 0.82)!;
+    final activeIconColor = isDark ? AppColors.darkTextPrimary : Colors.white;
+    final inactiveIconColor =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
 
     final isOnline = ref.watch(isOnlineProvider);
+    final autoHideEnabled = location.startsWith('/ranking');
+    final navVisibleState = ref.watch(navBarVisibleProvider);
+    final isNavVisible = autoHideEnabled ? navVisibleState : true;
 
     return Scaffold(
       extendBody:
@@ -95,82 +92,48 @@ class ShellScaffold extends ConsumerWidget {
           Expanded(child: child),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding:
-              const EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 8),
-          child: Container(
-            height: 70, // un poco más alto para verse más redondo y premium
-            decoration: BoxDecoration(
-              color: navBgColor,
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: borderColor, width: 0.5),
-              boxShadow: [
-                BoxShadow(
-                  color: shadowColor,
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(tabs.length, (i) {
-                final tab = tabs[i];
-                final isActive = currentIndex == i;
-
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.go(tab.route),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 2.0, vertical: 8.0),
-                      // ── Clean Pill con efecto lupa (sin texto) ──
-                      child: Container(
-                        color:
-                            Colors.transparent, // Facilita el área de tap total
-                        alignment: Alignment.center,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 600),
-                          curve: Curves.elasticOut, // Efecto gelatina
-                          width: isActive ? 52 : 40,
-                          height: isActive ? 52 : 40,
-                          decoration: BoxDecoration(
-                            color:
-                                isActive ? activePillColor : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: AnimatedScale(
-                            scale: isActive ? 1.2 : 1.0, // Efecto lupa
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves
-                                .elasticOut, // Movimiento de gelatina en el icono
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, animation) {
-                                // Usar fade para transición suave del ícono
-                                return FadeTransition(
-                                    opacity: animation, child: child);
-                              },
-                              child: Icon(
-                                isActive ? tab.iconActive : tab.icon,
-                                key: ValueKey<bool>(isActive),
-                                color:
-                                    isActive ? activeIconColor : inactiveColor,
-                                size:
-                                    24, // El tamaño base es el mismo, el zoom lo da AnimatedScale
-                              ),
+      bottomNavigationBar: AnimatedSlide(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        offset: isNavVisible ? Offset.zero : const Offset(0, 1.2),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: isNavVisible ? 1 : 0,
+          child: IgnorePointer(
+            ignoring: !isNavVisible,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                    left: 12, right: 12, bottom: 14, top: 6),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: CustomAnimatedBottomNavigationBar(
+                      items: tabs
+                          .map(
+                            (tab) => AnimatedNavBarItem(
+                              icon: tab.icon,
+                              activeIcon: tab.iconActive,
+                              tooltip: tab.label,
                             ),
-                          ),
-                        ),
-                      ),
+                          )
+                          .toList(),
+                      currentIndex: currentIndex,
+                      onTap: (index) => context.go(tabs[index].route),
+                      backgroundColor: navBgColor,
+                      indicatorColor: activeCircleColor,
+                      activeIconColor: activeIconColor,
+                      inactiveIconColor: inactiveIconColor,
+                      animationDuration: const Duration(milliseconds: 620),
+                      animationCurve: Curves.easeOutCubic,
+                      popUpDistance: 12,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                     ),
                   ),
-                );
-              }),
+                ),
+              ),
             ),
           ),
         ),

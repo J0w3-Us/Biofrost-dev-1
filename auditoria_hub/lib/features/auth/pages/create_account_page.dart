@@ -3,13 +3,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ui/feedback/haptic_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/form_label.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../domain/commands/login_command.dart';
 import '../domain/models/auth_state.dart';
+import '../presentation/controllers/create_account_controller.dart';
 import '../providers/auth_provider.dart';
 
 class CreateAccountPage extends ConsumerStatefulWidget {
@@ -54,6 +58,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
   late List<Animation<Offset>> _slideAnims;
   late AnimationController _checkCtrl;
   late Animation<double> _checkScale;
+  late CreateAccountController _createAccountController;
 
   static const _staggerCount = 6;
 
@@ -74,6 +79,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
   void initState() {
     super.initState();
     _emailCtrl.addListener(_onEmailChanged);
+    _createAccountController = CreateAccountController(ref);
     _buildStaggerAnims();
     _checkCtrl = AnimationController(
       vsync: this,
@@ -117,6 +123,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
   }
 
   void _advanceStep(int next) {
+    HapticFeedback.lightImpact();
     setState(() {
       _step = next;
       _errorMsg = null;
@@ -124,6 +131,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
     _staggerCtrl.reset();
     _staggerCtrl.forward();
     if (next == 3) {
+      HapticFeedback.selectionClick();
       _checkCtrl.reset();
       _checkCtrl.forward();
     }
@@ -147,6 +155,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
 
   // ── Step 0: crear cuenta en Firebase ─────────────────────────────────
   Future<void> _submitCredentials() async {
+    await HapticService.lightImpact();
     if (!_credFormKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     setState(() {
@@ -158,15 +167,12 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
       if (mounted && _isLoading) setState(() => _showWakeUp = true);
     });
 
-    await ref.read(authStateProvider.notifier).createAccount(
-          LoginCommand(
-            email: _emailCtrl.text.trim(),
-            password: _passCtrl.text,
-          ),
-        );
+    final authState = await _createAccountController.createAccount(
+      email: _emailCtrl.text,
+      password: _passCtrl.text,
+    );
 
     _wakeUpTimer?.cancel();
-    final authState = ref.read(authStateProvider);
     if (!mounted) return;
     setState(() {
       _isLoading = false;
@@ -182,6 +188,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
 
   // ── Step 1/2: completar perfil en el backend ─────────────────────────
   Future<void> _submitProfile() async {
+    await HapticService.lightImpact();
     FocusScope.of(context).unfocus();
     setState(() {
       _isLoading = true;
@@ -193,7 +200,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
     });
 
     try {
-      final cmd = CompleteProfileCommand(
+      final authState = await _createAccountController.completeProfile(
         firebaseUid: _firebaseUid,
         nombre: _nameCtrl.text.trim(),
         apellidoPaterno: _apellidoPaternoCtrl.text.trim().isNotEmpty
@@ -204,7 +211,6 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
             : null,
         email: _emailCtrl.text.trim(),
         rol: _detectedRole.isEmpty ? 'Invitado' : _detectedRole,
-        profesion: null,
         organizacion: _isGuest && _orgCtrl.text.trim().isNotEmpty
             ? _orgCtrl.text.trim()
             : null,
@@ -220,8 +226,6 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
               ]
             : const [],
       );
-
-      await ref.read(authStateProvider.notifier).completeProfile(cmd);
       if (!mounted) return;
       _wakeUpTimer?.cancel();
       setState(() {
@@ -229,11 +233,11 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
         _showWakeUp = false;
       });
 
-      final authState = ref.read(authStateProvider);
       if (authState is AuthError) {
         setState(() => _errorMsg = authState.message);
         return;
       }
+      await HapticService.success();
       _advanceStep(3);
     } catch (e) {
       if (!mounted) return;
@@ -336,6 +340,9 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
               // ── Step content ───────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
@@ -385,8 +392,9 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
   // ── Step 0: Credenciales ──────────────────────────────────────────────
   Widget _buildStep0(
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
-    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
-    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
+    final primaryBtn = isDark ? AppColors.darkPrimary : AppColors.lightForeground;
+    final primaryBtnText =
+      isDark ? AppColors.darkTextInverse : AppColors.lightCard;
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
     final textPrimary =
@@ -426,7 +434,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface2 : Colors.white,
+                      color: isDark ? AppColors.darkSurface2 : AppColors.lightCard,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -655,33 +663,37 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
               children: [
                 SizedBox(
                   height: 54,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryBtn,
-                      foregroundColor: primaryBtnText,
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.full)),
-                    ),
-                    onPressed: _isLoading ? null : _submitCredentials,
-                    child: _isLoading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: primaryBtnText),
-                          )
-                        : Text(
-                            'Continuar',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.3,
-                              color: primaryBtnText,
+                  child: PressScale(
+                    enabled: !_isLoading,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryBtn,
+                        foregroundColor: primaryBtnText,
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.full)),
+                      ),
+                      onPressed: _isLoading ? null : _submitCredentials,
+                      child: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: primaryBtnText),
+                            )
+                          : Text(
+                              'Continuar',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.3,
+                                color: primaryBtnText,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -727,8 +739,9 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
       bool isDark, Color accent, Widget Function(int, Widget) stagger) {
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
-    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
-    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
+    final primaryBtn = isDark ? AppColors.darkPrimary : AppColors.lightForeground;
+    final primaryBtnText =
+      isDark ? AppColors.darkTextInverse : AppColors.lightCard;
 
     return Form(
       key: _profileFormKey,
@@ -782,13 +795,11 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
                         textCapitalization: TextCapitalization.words,
                         style: TextStyle(
                             fontFamily: 'Inter',
-                            fontSize: 14,
+                            fontSize: 15,
                             color: textPrimary),
                         decoration: const InputDecoration(
                           hintText: 'Paterno',
-                          prefixIcon: Icon(Icons.person_2_outlined, size: 16),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 14),
+                          prefixIcon: Icon(Icons.person_2_outlined, size: 18),
                         ),
                       ),
                     ],
@@ -807,13 +818,11 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
                         textCapitalization: TextCapitalization.words,
                         style: TextStyle(
                             fontFamily: 'Inter',
-                            fontSize: 14,
+                            fontSize: 15,
                             color: textPrimary),
                         decoration: const InputDecoration(
                           hintText: 'Materno',
-                          prefixIcon: Icon(Icons.person_3_outlined, size: 16),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 14),
+                          prefixIcon: Icon(Icons.person_3_outlined, size: 18),
                         ),
                       ),
                     ],
@@ -880,43 +889,46 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
             4,
             SizedBox(
               height: 54,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBtn,
-                  foregroundColor: primaryBtnText,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.full)),
-                ),
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        if (!_profileFormKey.currentState!.validate()) return;
-                        FocusScope.of(context).unfocus();
-                        if (_hasAcademicStep) {
-                          ref.read(catalogProvider.notifier).loadCarreras();
-                          _advanceStep(2);
-                        } else {
-                          _submitProfile();
-                        }
-                      },
-                child: _isLoading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: primaryBtnText),
-                      )
-                    : Text(
-                        _hasAcademicStep ? 'Continuar' : 'Finalizar',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: primaryBtnText,
+              child: PressScale(
+                enabled: !_isLoading,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBtn,
+                    foregroundColor: primaryBtnText,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full)),
+                  ),
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          if (!_profileFormKey.currentState!.validate()) return;
+                          FocusScope.of(context).unfocus();
+                          if (_hasAcademicStep) {
+                            ref.read(catalogProvider.notifier).loadCarreras();
+                            _advanceStep(2);
+                          } else {
+                            _submitProfile();
+                          }
+                        },
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: primaryBtnText),
+                        )
+                      : Text(
+                          _hasAcademicStep ? 'Continuar' : 'Finalizar',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: primaryBtnText,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
           ),
@@ -933,8 +945,9 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-    final primaryBtn = isDark ? Colors.white : AppColors.lightForeground;
-    final primaryBtnText = isDark ? AppColors.darkTextInverse : Colors.white;
+    final primaryBtn = isDark ? AppColors.darkPrimary : AppColors.lightForeground;
+    final primaryBtnText =
+      isDark ? AppColors.darkTextInverse : AppColors.lightCard;
 
     final catalog = ref.watch(catalogProvider);
     final carreras = catalog.carreras;
@@ -1113,7 +1126,7 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
                                   : AppColors.lightBorder),
                         ),
                         backgroundColor:
-                            isDark ? AppColors.darkSurface1 : Colors.white,
+                          isDark ? AppColors.darkSurface1 : AppColors.lightCard,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadius.md)),
                         onSelected: (checked) => setState(() {
@@ -1156,32 +1169,36 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
           4,
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBtn,
-                foregroundColor: primaryBtnText,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: _isLoading || loadingCatalogs ? null : _submitProfile,
-              child: _isLoading
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: primaryBtnText),
-                    )
-                  : Text(
-                      'Finalizar',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: primaryBtnText,
+            child: PressScale(
+              enabled: !_isLoading && !loadingCatalogs,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBtn,
+                  foregroundColor: primaryBtnText,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full)),
+                ),
+                onPressed:
+                    _isLoading || loadingCatalogs ? null : _submitProfile,
+                child: _isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: primaryBtnText),
+                      )
+                    : Text(
+                        'Finalizar',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: primaryBtnText,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),
@@ -1258,31 +1275,36 @@ class _CreateAccountPageState extends ConsumerState<CreateAccountPage>
           3,
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
-              onPressed: () => context.go('/showcase'),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Ir a la plataforma',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
+            child: PressScale(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: AppColors.lightCard,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full)),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.go('/showcase');
+                },
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Ir a la plataforma',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1408,7 +1430,7 @@ class _SelectorRow extends StatelessWidget {
     final mutedColor =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final bg = isDark ? AppColors.darkSurface1 : Colors.white;
+    final bg = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
 
     return GestureDetector(
       onTap: onTap,
@@ -1471,7 +1493,7 @@ class _SelectorSheet<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = isDark ? AppColors.darkAccent : AppColors.lightAccent;
-    final surface = isDark ? AppColors.darkSurface1 : Colors.white;
+    final surface = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
     final mutedColor =

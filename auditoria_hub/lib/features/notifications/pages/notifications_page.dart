@@ -1,5 +1,6 @@
 // features/notifications/pages/notifications_page.dart — Historial de notificaciones
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -18,8 +19,10 @@ class NotificationsPage extends ConsumerWidget {
         actions: [
           if (notifications.isNotEmpty)
             TextButton(
-              onPressed: () =>
-                  ref.read(notificationsProvider.notifier).clearAll(),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(notificationsProvider.notifier).clearAll();
+              },
               child: const Text('Limpiar'),
             ),
         ],
@@ -43,6 +46,9 @@ class NotificationsPage extends ConsumerWidget {
               ),
             )
           : ListView.separated(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               itemCount: notifications.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (ctx, i) {
@@ -59,8 +65,10 @@ class NotificationsPage extends ConsumerWidget {
                     DateFormat('dd/MM HH:mm').format(n.receivedAt),
                     style: Theme.of(ctx).textTheme.labelSmall,
                   ),
-                  onTap: () =>
-                      ref.read(notificationsProvider.notifier).markRead(n.id),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(notificationsProvider.notifier).markRead(n.id);
+                  },
                 );
               },
             ),

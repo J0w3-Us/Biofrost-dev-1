@@ -1,10 +1,12 @@
 // features/dashboard/pages/dashboard_page.dart — Panel del Docente
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/bio_empty_state.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../domain/models/teacher_project_model.dart';
@@ -63,6 +65,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         child: RefreshIndicator(
           onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
           child: CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             slivers: [
               // ── Header ─────────────────────────────────────────────────
               SliverToBoxAdapter(
@@ -124,34 +129,21 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: TextField(
                     controller: _searchCtrl,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightForeground,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Buscar proyecto o alumno...',
-                      filled: true,
-                      fillColor:
-                          isDark ? AppColors.darkSurface1 : AppColors.lightCard,
                       prefixIcon: Icon(
                         Icons.search_rounded,
                         size: 18,
                         color: isDark
                             ? AppColors.darkTextSecondary
                             : AppColors.lightMutedFg,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        borderSide: const BorderSide(
-                          color: AppColors.lightPrimary,
-                          width: 1.2,
-                        ),
                       ),
                       suffixIcon: _query.isNotEmpty
                           ? IconButton(
@@ -163,6 +155,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                     : AppColors.lightMutedFg,
                               ),
                               onPressed: () {
+                                HapticFeedback.selectionClick();
                                 _searchCtrl.clear();
                                 setState(() => _query = '');
                               },
@@ -419,109 +412,114 @@ class _ProjectRow extends StatelessWidget {
     final textSecondary =
         isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 26 : 10),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Thumbnail o placeholder
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: project.thumbnailUrl != null
-                  ? Image.network(
-                      project.thumbnailUrl!,
-                      width: 52,
-                      height: 52,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _Placeholder(isDark: isDark),
-                    )
-                  : _Placeholder(isDark: isDark),
-            ),
-            const SizedBox(width: 12),
+    return PressScale(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(isDark ? 26 : 10),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Thumbnail o placeholder
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: project.thumbnailUrl != null
+                    ? Image.network(
+                        project.thumbnailUrl!,
+                        width: 52,
+                        height: 52,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _Placeholder(isDark: isDark),
+                      )
+                    : _Placeholder(isDark: isDark),
+              ),
+              const SizedBox(width: 12),
 
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    project.titulo,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (project.liderNombre != null) ...[
-                    const SizedBox(height: 2),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      project.liderNombre!,
+                      project.titulo,
                       style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  if (project.materia != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      project.materia!,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 11,
-                        color: textSecondary,
-                        fontStyle: FontStyle.italic,
+                    if (project.liderNombre != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        project.liderNombre!,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
+                    if (project.materia != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        project.materia!,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Status chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _statusColor.withAlpha(25),
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-              child: Text(
-                _statusLabel,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: _statusColor,
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
 
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, color: textSecondary, size: 18),
-          ],
+              // Status chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  _statusLabel,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _statusColor,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded, color: textSecondary, size: 18),
+            ],
+          ),
         ),
       ),
     );
@@ -570,7 +568,10 @@ class _ErrorView extends StatelessWidget {
                 style: const TextStyle(fontFamily: 'Inter')),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: onRetry,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onRetry();
+              },
               child: const Text('Reintentar'),
             ),
           ],

@@ -22,6 +22,8 @@ class App extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 140),
+      themeAnimationCurve: Curves.easeOutCubic,
       routerConfig: router,
 
     );

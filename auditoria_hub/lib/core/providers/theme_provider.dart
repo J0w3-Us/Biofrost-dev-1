@@ -1,4 +1,6 @@
 // core/providers/theme_provider.dart — Toggle de tema oscuro/claro
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,10 +23,21 @@ class ThemeNotifier extends Notifier<ThemeMode> {
   }
 
   Future<void> toggle() async {
-    state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    final next = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    state = next;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _kThemeKey, state == ThemeMode.light ? 'light' : 'dark');
+    unawaited(
+      prefs.setString(_kThemeKey, next == ThemeMode.light ? 'light' : 'dark'),
+    );
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (state == mode) return;
+    state = mode;
+    final prefs = await SharedPreferences.getInstance();
+    unawaited(
+      prefs.setString(_kThemeKey, mode == ThemeMode.light ? 'light' : 'dark'),
+    );
   }
 
   bool get isDark => state == ThemeMode.dark;

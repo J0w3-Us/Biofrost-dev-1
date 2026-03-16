@@ -7,25 +7,21 @@ import '../data/account_security_service.dart';
 class AccountSettingsState {
   const AccountSettingsState({
     this.isLoading = false,
-    this.biometricEnabled = false,
     this.errorMessage,
     this.successMessage,
   });
 
   final bool isLoading;
-  final bool biometricEnabled;
   final String? errorMessage;
   final String? successMessage;
 
   AccountSettingsState copyWith({
     bool? isLoading,
-    bool? biometricEnabled,
     String? errorMessage,
     String? successMessage,
   }) {
     return AccountSettingsState(
       isLoading: isLoading ?? this.isLoading,
-      biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       errorMessage: errorMessage,
       successMessage: successMessage,
     );
@@ -116,57 +112,6 @@ class AccountSettingsController extends Notifier<AccountSettingsState> {
         successMessage: null,
       );
       return false;
-    }
-  }
-
-  Future<void> toggleBiometric(bool enable) async {
-    if (!enable) {
-      state = state.copyWith(
-        biometricEnabled: false,
-        errorMessage: null,
-        successMessage: 'Biometría desactivada.',
-      );
-      return;
-    }
-
-    state = state.copyWith(
-      isLoading: true,
-      errorMessage: null,
-      successMessage: null,
-    );
-
-    try {
-      final approved = await _security.authenticateBiometricActivation();
-      if (!approved) {
-        state = state.copyWith(
-          isLoading: false,
-          biometricEnabled: false,
-          errorMessage: 'No se pudo verificar tu identidad biométrica.',
-          successMessage: null,
-        );
-        return;
-      }
-
-      state = state.copyWith(
-        isLoading: false,
-        biometricEnabled: true,
-        errorMessage: null,
-        successMessage: 'Biometría activada correctamente.',
-      );
-    } on AppException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        biometricEnabled: false,
-        errorMessage: e.message,
-        successMessage: null,
-      );
-    } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        biometricEnabled: false,
-        errorMessage: 'No se pudo activar la biometría.',
-        successMessage: null,
-      );
     }
   }
 

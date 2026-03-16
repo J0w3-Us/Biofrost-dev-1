@@ -43,7 +43,7 @@ class BioButton extends StatelessWidget {
     final isSecondary = variant == BioButtonVariant.secondary;
 
     final Color textColor = isPrimary
-        ? (isDark ? AppColors.darkTextInverse : Colors.white)
+      ? (isDark ? AppColors.darkTextInverse : AppColors.lightCard)
         : isSecondary
             ? (isDark ? AppColors.darkTextPrimary : AppColors.lightForeground)
             : (isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg);
@@ -269,7 +269,7 @@ class UserAvatar extends StatelessWidget {
             fontFamily: 'Inter',
             fontSize: size * 0.35,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: AppColors.lightCard,
           ),
         ),
       ),
@@ -614,7 +614,7 @@ class OfflineBanner extends StatelessWidget {
       child: visible
           ? Container(
               width: double.infinity,
-              color: const Color(0xFFB45309),
+              color: AppColors.warning,
               padding: const EdgeInsets.symmetric(
                 vertical: AppSpacing.sp6,
                 horizontal: AppSpacing.sp16,
@@ -622,7 +622,10 @@ class OfflineBanner extends StatelessWidget {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white),
+                  Icon(
+                      Icons.wifi_off_rounded,
+                      size: 14,
+                      color: AppColors.lightCard),
                   SizedBox(width: AppSpacing.sp6),
                   Text(
                     'Sin conexión — mostrando datos en caché',
@@ -630,7 +633,7 @@ class OfflineBanner extends StatelessWidget {
                       fontFamily: 'Inter',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.lightCard,
                     ),
                   ),
                 ],

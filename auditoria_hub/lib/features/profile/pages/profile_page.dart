@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../../auth/domain/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/profile_remote_datasource.dart';
@@ -27,7 +28,6 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final themeMode = ref.watch(themeProvider);
 
     if (auth is! AuthAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,7 +54,7 @@ class ProfilePage extends ConsumerWidget {
         ),
         actions: [
           // ── Toggle tema — discreto, sin tooltip verboso ──────────────
-          _ThemeToggleButton(isDark: isDark, themeMode: themeMode, ref: ref),
+          _ThemeToggleButton(isDark: isDark),
           const SizedBox(width: 8),
         ],
       ),
@@ -124,6 +124,7 @@ class ProfilePage extends ConsumerWidget {
 
   Future<void> _pickAndUploadPhoto(
       BuildContext context, WidgetRef ref, AuthAuthenticated auth) async {
+    await HapticFeedback.lightImpact();
     final picker = ImagePicker();
     final picked =
         await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
@@ -151,6 +152,7 @@ class ProfilePage extends ConsumerWidget {
   Future<void> _saveName(BuildContext context, WidgetRef ref,
       AuthAuthenticated auth, String name) async {
     if (name.trim().isEmpty || name.trim() == auth.displayName) return;
+    await HapticFeedback.lightImpact();
     final ds = ref.read(profileRemoteDatasourceProvider);
     try {
       await ds.updateDisplayName(auth.uid, name.trim());
@@ -207,6 +209,7 @@ class ProfilePage extends ConsumerWidget {
     );
 
     if (confirmed == true) {
+      await HapticFeedback.lightImpact();
       await ref.read(authStateProvider.notifier).logout();
       if (context.mounted) context.go('/login');
     }
@@ -216,20 +219,16 @@ class ProfilePage extends ConsumerWidget {
 // ── Theme Toggle Button ───────────────────────────────────────────────────────
 // Icono discreto sin fondo ni borde — un solo trazo limpio
 
-class _ThemeToggleButton extends StatelessWidget {
+class _ThemeToggleButton extends ConsumerWidget {
   const _ThemeToggleButton({
     required this.isDark,
-    required this.themeMode,
-    required this.ref,
   });
 
   final bool isDark;
-  final ThemeMode themeMode;
-  final WidgetRef ref;
 
   @override
-  Widget build(BuildContext context) {
-    final icon = themeMode == ThemeMode.dark
+  Widget build(BuildContext context, WidgetRef ref) {
+    final icon = isDark
         ? Icons.light_mode_rounded
         : Icons.dark_mode_outlined;
     final color = isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
@@ -242,12 +241,12 @@ class _ThemeToggleButton extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
+          duration: const Duration(milliseconds: 120),
           transitionBuilder: (child, animation) => ScaleTransition(
             scale: animation,
             child: FadeTransition(opacity: animation, child: child),
           ),
-          child: Icon(icon, key: ValueKey(themeMode), size: 22, color: color),
+          child: Icon(icon, key: ValueKey<bool>(isDark), size: 22, color: color),
         ),
       ),
     );
@@ -302,6 +301,7 @@ class _SignOutButtonState extends State<_SignOutButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) {
           setState(() => _pressed = false);
+          HapticFeedback.lightImpact();
           widget.onPressed();
         },
         onTapCancel: () => setState(() => _pressed = false),
@@ -416,6 +416,7 @@ class _EditSocialSheetState extends State<_EditSocialSheet> {
   }
 
   Future<void> _save() async {
+    await HapticFeedback.lightImpact();
     final links = <String, String>{
       for (final entry in _ctrls.entries)
         if (entry.value.text.trim().isNotEmpty)
@@ -430,6 +431,7 @@ class _EditSocialSheetState extends State<_EditSocialSheet> {
           .read(authStateProvider.notifier)
           .updateSocialLinksInState(links);
       if (mounted) {
+        await HapticFeedback.selectionClick();
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Redes sociales actualizadas')),
@@ -519,16 +521,19 @@ class _EditSocialSheetState extends State<_EditSocialSheet> {
           const SizedBox(height: AppSpacing.sp12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text('Guardar cambios'),
+            child: PressScale(
+              enabled: !_saving,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: AppColors.lightCard, strokeWidth: 2),
+                      )
+                    : const Text('Guardar cambios'),
+              ),
             ),
           ),
         ],
@@ -583,30 +588,25 @@ class _SocialField extends StatelessWidget {
           autocorrect: false,
           style: TextStyle(
             fontFamily: 'Inter',
-            fontSize: 14,
+            fontSize: 15,
             color: textPrimary,
           ),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, size: 18, color: textMuted),
             hintText: hint,
-            filled: true,
-            fillColor:
-                isDark ? AppColors.darkSurface2 : AppColors.lightBackground,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               borderSide:
                   const BorderSide(color: AppColors.lightPrimary, width: 1.5),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sp12, vertical: AppSpacing.sp13),
           ),
         ),
       ],

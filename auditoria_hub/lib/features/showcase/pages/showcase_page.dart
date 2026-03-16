@@ -1,5 +1,6 @@
 // features/showcase/pages/showcase_page.dart — RF-02: Galería Feed (Biofrost v2)
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -82,7 +83,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                       autofocus: true,
                       style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 14,
+                        fontSize: 15,
                         color: isDark
                             ? AppColors.darkTextPrimary
                             : AppColors.lightForeground,
@@ -111,6 +112,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                                 : AppColors.lightMutedFg,
                           ),
                           onPressed: () {
+                            HapticFeedback.selectionClick();
                             if (_searchCtrl.text.isEmpty) {
                               setState(() => _isSearchExpanded = false);
                             } else {
@@ -121,16 +123,6 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                               setState(() {});
                             }
                           },
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 0),
-                        filled: true,
-                        fillColor: isDark
-                            ? AppColors.darkSurface2
-                            : AppColors.lightMuted,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                          borderSide: BorderSide.none,
                         ),
                       ),
                       onChanged: (q) {
@@ -173,8 +165,10 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                                 ? AppColors.darkTextPrimary
                                 : AppColors.lightForeground,
                           ),
-                          onPressed: () =>
-                              _showNotificationsSheet(context, bellRef),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _showNotificationsSheet(context, bellRef);
+                          },
                         ),
                         if (unread > 0)
                           Positioned(
@@ -194,7 +188,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                                   fontFamily: 'Inter',
                                   fontSize: 9,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AppColors.lightCard,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -212,6 +206,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                         : AppColors.lightForeground,
                   ),
                   onPressed: () {
+                    HapticFeedback.lightImpact();
                     setState(() {
                       _isSearchExpanded = true;
                     });
@@ -239,6 +234,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                         height: 36,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: techs.length,
                           separatorBuilder: (_, __) => const SizedBox(width: 6),
@@ -246,6 +242,7 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
                             label: techs[i],
                             isSelected: _selectedTech == techs[i],
                             onTap: () {
+                              HapticFeedback.selectionClick();
                               setState(() {
                                 _selectedTech =
                                     _selectedTech == techs[i] ? '' : techs[i];
@@ -313,6 +310,9 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
       backgroundColor:
           isDark ? AppColors.darkSurface2 : AppColors.lightSecondary,
       child: ListView.builder(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.only(
             top: 0, bottom: AppSpacing.sp64 + AppSpacing.sp24),
         itemCount: filteredProjects.length + (state.hasMore ? 2 : 0),
@@ -329,7 +329,10 @@ class _ShowcasePageState extends ConsumerState<ShowcasePage> {
             index: i,
             child: ProjectCard(
               project: project,
-              onTap: () => context.push('/project/${project.id}'),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                context.push('/project/${project.id}');
+              },
             ),
           );
         },
@@ -549,7 +552,10 @@ class _NotificationsBottomSheet extends StatelessWidget {
                   const Spacer(),
                   if (notifications.isNotEmpty)
                     TextButton(
-                      onPressed: notifier.clearAll,
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        notifier.clearAll();
+                      },
                       child: Text(
                         'Limpiar todo',
                         style: TextStyle(
@@ -669,7 +675,10 @@ class _NotificationsBottomSheet extends StatelessWidget {
                               ),
                             ],
                           ),
-                          onTap: () => notifier.markRead(n.id),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            notifier.markRead(n.id);
+                          },
                         );
                       },
                     ),

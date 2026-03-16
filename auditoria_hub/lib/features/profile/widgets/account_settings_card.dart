@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/micro_interactions.dart';
 import '../providers/account_settings_controller.dart';
 
 class AccountSettingsCard extends ConsumerStatefulWidget {
@@ -118,47 +120,52 @@ class _AccountSettingsCardState extends ConsumerState<AccountSettingsCard> {
                   const SizedBox(height: AppSpacing.sp16),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: ctrlState.isLoading
-                          ? null
-                          : () async {
-                              ref
-                                  .read(accountSettingsControllerProvider
-                                      .notifier)
-                                  .clearMessages();
+                    child: PressScale(
+                      enabled: !ctrlState.isLoading,
+                      child: ElevatedButton(
+                        onPressed: ctrlState.isLoading
+                            ? null
+                            : () async {
+                                await HapticFeedback.lightImpact();
+                                ref
+                                    .read(accountSettingsControllerProvider
+                                        .notifier)
+                                    .clearMessages();
 
-                              final success = await ref
-                                  .read(accountSettingsControllerProvider
-                                      .notifier)
-                                  .changePassword(
-                                    currentPassword: currentCtrl.text,
-                                    newPassword: nextCtrl.text,
-                                  );
+                                final success = await ref
+                                    .read(accountSettingsControllerProvider
+                                        .notifier)
+                                    .changePassword(
+                                      currentPassword: currentCtrl.text,
+                                      newPassword: nextCtrl.text,
+                                    );
 
-                              if (!mounted) return;
-                              if (success) {
-                                Navigator.of(sheetContext).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Contrasena actualizada correctamente',
+                                if (!mounted) return;
+                                if (success) {
+                                  await HapticFeedback.selectionClick();
+                                  Navigator.of(sheetContext).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Contrasena actualizada correctamente',
+                                      ),
                                     ),
-                                  ),
-                                );
-                              } else {
-                                setLocalState(() {});
-                              }
-                            },
-                      child: ctrlState.isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text('Guardar contrasena'),
+                                  );
+                                } else {
+                                  setLocalState(() {});
+                                }
+                              },
+                        child: ctrlState.isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: AppColors.lightCard,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Guardar contrasena'),
+                      ),
                     ),
                   ),
                 ],
@@ -171,20 +178,6 @@ class _AccountSettingsCardState extends ConsumerState<AccountSettingsCard> {
 
     currentCtrl.dispose();
     nextCtrl.dispose();
-  }
-
-  Future<void> _toggleBiometric(bool enable) async {
-    await ref
-        .read(accountSettingsControllerProvider.notifier)
-        .toggleBiometric(enable);
-    if (!mounted) return;
-
-    final result = ref.read(accountSettingsControllerProvider);
-    final message = result.errorMessage ?? result.successMessage;
-    if (message != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    }
   }
 
   Future<void> _startDeleteFlow() async {
@@ -287,43 +280,48 @@ class _AccountSettingsCardState extends ConsumerState<AccountSettingsCard> {
                   const SizedBox(height: AppSpacing.sp16),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: ctrlState.isLoading
-                          ? null
-                          : () async {
-                              ref
-                                  .read(accountSettingsControllerProvider
-                                      .notifier)
-                                  .clearMessages();
+                    child: PressScale(
+                      enabled: !ctrlState.isLoading,
+                      child: ElevatedButton(
+                        onPressed: ctrlState.isLoading
+                            ? null
+                            : () async {
+                                await HapticFeedback.lightImpact();
+                                ref
+                                    .read(accountSettingsControllerProvider
+                                        .notifier)
+                                    .clearMessages();
 
-                              final success = await ref
-                                  .read(accountSettingsControllerProvider
-                                      .notifier)
-                                  .deleteAccountWithVerification(
-                                    currentPassword: passwordCtrl.text,
-                                  );
+                                final success = await ref
+                                    .read(accountSettingsControllerProvider
+                                        .notifier)
+                                    .deleteAccountWithVerification(
+                                      currentPassword: passwordCtrl.text,
+                                    );
 
-                              if (!mounted) return;
-                              if (success) {
-                                Navigator.of(sheetContext).pop();
-                                widget.onAccountDeleted();
-                              } else {
-                                setLocalState(() {});
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error,
+                                if (!mounted) return;
+                                if (success) {
+                                  await HapticFeedback.selectionClick();
+                                  Navigator.of(sheetContext).pop();
+                                  widget.onAccountDeleted();
+                                } else {
+                                  setLocalState(() {});
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                        ),
+                        child: ctrlState.isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: AppColors.lightCard,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Eliminar definitivamente'),
                       ),
-                      child: ctrlState.isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text('Eliminar definitivamente'),
                     ),
                   ),
                 ],
@@ -338,7 +336,6 @@ class _AccountSettingsCardState extends ConsumerState<AccountSettingsCard> {
 
   @override
   Widget build(BuildContext context) {
-    final settingsState = ref.watch(accountSettingsControllerProvider);
     final isDark = widget.isDark;
     final bgCard = isDark ? AppColors.darkSurface1 : AppColors.lightCard;
     final textPrimary =
@@ -378,23 +375,6 @@ class _AccountSettingsCardState extends ConsumerState<AccountSettingsCard> {
                   color: textMuted,
                 ),
                 onTap: _openChangePasswordSheet,
-              ),
-              Divider(
-                height: 0.5,
-                thickness: 0.5,
-                color: dividerColor,
-                indent: AppSpacing.sp62,
-              ),
-              _AccountTile(
-                icon: Icons.fingerprint_rounded,
-                iconColor: AppColors.lightOlive,
-                title: 'Face ID / Huella Digital',
-                titleColor: textPrimary,
-                trailing: Switch.adaptive(
-                  value: settingsState.biometricEnabled,
-                  activeColor: AppColors.lightPrimary,
-                  onChanged: settingsState.isLoading ? null : _toggleBiometric,
-                ),
               ),
               Divider(
                 height: 0.5,
@@ -559,7 +539,10 @@ class _AccountTile extends StatelessWidget {
     if (onTap == null) return row;
 
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
       splashColor: AppColors.lightPrimary.withAlpha(12),
       highlightColor: AppColors.lightPrimary.withAlpha(8),
       child: row,

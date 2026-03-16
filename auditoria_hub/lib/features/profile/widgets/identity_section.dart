@@ -209,7 +209,7 @@ class _EditableAvatarState extends State<_EditableAvatar>
                 child: const Icon(
                   Icons.camera_alt_rounded,
                   size: 13,
-                  color: Colors.white,
+                  color: AppColors.lightCard,
                 ),
               ),
             ),

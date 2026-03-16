@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
 
 import '../../../core/config/api_endpoints.dart';
 import '../../../core/errors/app_exception.dart';
@@ -11,7 +10,6 @@ final accountSecurityServiceProvider = Provider<AccountSecurityService>(
   (ref) => AccountSecurityService(
     dio: ref.watch(dioProvider),
     firebaseAuth: FirebaseAuth.instance,
-    localAuth: LocalAuthentication(),
   ),
 );
 
@@ -19,14 +17,11 @@ class AccountSecurityService {
   AccountSecurityService({
     required Dio dio,
     required FirebaseAuth firebaseAuth,
-    required LocalAuthentication localAuth,
   })  : _dio = dio,
-        _firebaseAuth = firebaseAuth,
-        _localAuth = localAuth;
+        _firebaseAuth = firebaseAuth;
 
   final Dio _dio;
   final FirebaseAuth _firebaseAuth;
-  final LocalAuthentication _localAuth;
 
   Future<void> changePassword({
     required String currentPassword,
@@ -35,32 +30,6 @@ class AccountSecurityService {
     await _reauthenticate(currentPassword);
     final user = _requireUser();
     await user.updatePassword(newPassword);
-  }
-
-  Future<bool> authenticateBiometricActivation() async {
-    final canCheck = await _localAuth.canCheckBiometrics;
-    final supported = await _localAuth.isDeviceSupported();
-    if (!canCheck || !supported) {
-      throw const ValidationException(
-        'Tu dispositivo no tiene biometría disponible.',
-      );
-    }
-
-    final biometrics = await _localAuth.getAvailableBiometrics();
-    if (biometrics.isEmpty) {
-      throw const ValidationException(
-        'No hay Face ID/huella configurados en el dispositivo.',
-      );
-    }
-
-    return _localAuth.authenticate(
-      localizedReason:
-          'Confirma tu identidad para activar Face ID / Huella Digital.',
-      options: const AuthenticationOptions(
-        biometricOnly: true,
-        stickyAuth: true,
-      ),
-    );
   }
 
   Future<void> softDeleteAccount({required String currentPassword}) async {

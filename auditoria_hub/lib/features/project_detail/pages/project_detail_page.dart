@@ -116,9 +116,12 @@ class _ProjectDetailPageState extends ConsumerState<ProjectDetailPage>
                       : AppColors.lightForeground,
                   size: 20,
                 ),
-                onPressed: () => SharePlus.instance.share(
-                  ShareParams(text: 'Mira este proyecto: ${project.title}'),
-                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  SharePlus.instance.share(
+                    ShareParams(text: 'Mira este proyecto: ${project.title}'),
+                  );
+                },
               ),
             ],
             bottom: TabBar(
@@ -149,6 +152,9 @@ class _ProjectDetailPageState extends ConsumerState<ProjectDetailPage>
           children: [
             // ── Tab 1: Proyecto ────────────────────────────────────────
             SingleChildScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               padding: const EdgeInsets.all(AppSpacing.sp16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,6 +313,9 @@ class _ProjectDetailPageState extends ConsumerState<ProjectDetailPage>
 
             // ── Tab 2: Evaluaciones ────────────────────────────────────
             SingleChildScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               padding: const EdgeInsets.all(AppSpacing.sp16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,6 +398,7 @@ class _BackButton extends StatelessWidget {
         color: isDark ? AppColors.darkTextPrimary : AppColors.lightForeground,
       ),
       onPressed: () {
+        HapticFeedback.lightImpact();
         if (Navigator.canPop(context)) Navigator.pop(context);
       },
     );
@@ -591,6 +601,7 @@ class _MediaEvidenceCard extends StatelessWidget {
   final bool isDark;
 
   Future<void> _openVideo(BuildContext context) async {
+    HapticFeedback.lightImpact();
     final raw = videoUrl;
     if (raw == null || raw.trim().isEmpty) return;
 
@@ -647,7 +658,7 @@ class _MediaEvidenceCard extends StatelessWidget {
                         child: Stack(
                           children: [
                             ColoredBox(
-                              color: Colors.black,
+                              color: AppColors.darkSurface0,
                               child: Center(
                                 child: InteractiveViewer(
                                   child: CachedNetworkImage(
@@ -661,10 +672,13 @@ class _MediaEvidenceCard extends StatelessWidget {
                               top: 18,
                               right: 12,
                               child: IconButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  Navigator.pop(context);
+                                },
                                 icon: const Icon(
                                   Icons.close_rounded,
-                                  color: Colors.white,
+                                  color: AppColors.lightCard,
                                 ),
                               ),
                             ),
@@ -776,7 +790,10 @@ class _MediaEvidenceCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sp8),
                 TextButton(
                   onPressed: (videoUrl != null && videoUrl!.trim().isNotEmpty)
-                      ? () => _openVideo(context)
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          _openVideo(context);
+                        }
                       : null,
                   child: Text(
                     'Abrir',
@@ -1018,8 +1035,8 @@ class _EvalCard extends ConsumerWidget {
                         fontFamily: 'Inter',
                         fontSize: 11,
                         color: eval.tipo == 'oficial'
-                            ? const Color(0xFF2563EB)
-                            : const Color(0xFF9333EA),
+                            ? AppColors.info
+                            : AppColors.lightOlive,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1035,7 +1052,7 @@ class _EvalCard extends ConsumerWidget {
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
                     size: 14,
-                    color: Colors.amber,
+                    color: AppColors.warning,
                   );
                 }),
               ),

@@ -1,52 +1,89 @@
-// features/ranking/pages/ranking_page.dart — Pantalla de ranking (Biofrost v2 — Clean Podium)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/providers/nav_bar_visibility_provider.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../showcase/domain/models/project_read_model.dart';
 import '../../showcase/providers/showcase_provider.dart';
 
-class RankingPage extends ConsumerWidget {
+class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(showcaseProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  ConsumerState<RankingPage> createState() => _RankingPageState();
+}
 
-    // Sort by score descending
+class _RankingPageState extends ConsumerState<RankingPage> {
+  late final ScrollController _scrollController;
+  late final HideOnScrollController _hideOnScrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _hideOnScrollController = HideOnScrollController();
+    _hideOnScrollController.attach(_scrollController, ref);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor =
+        isDark ? AppColors.darkSurface0 : AppColors.lightBackground;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightForeground;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
+    final state = ref.watch(showcaseProvider);
+
     final sorted = [...state.projects]
       ..sort((a, b) => b.avgScore.compareTo(a.avgScore));
 
-    final top3 = sorted.take(3).toList();
+    final top3 = List<ProjectReadModel?>.generate(
+      3,
+      (index) => index < sorted.length ? sorted[index] : null,
+    );
     final rest = sorted.skip(3).toList();
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
+        backgroundColor: backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
         automaticallyImplyLeading: false,
+        titleSpacing: 20,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Ranking',
               style: TextStyle(
                 fontFamily: 'Inter',
-                fontSize: 22,
+                fontSize: 28,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+                letterSpacing: -0.8,
+                color: textPrimary,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
-              'Proyectos más destacados',
+              'Desempeño académico y proyectos destacados',
               style: TextStyle(
                 fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightMutedFg,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.1,
+                color: textSecondary,
               ),
             ),
           ],
@@ -55,218 +92,280 @@ class RankingPage extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Icon(
-              Icons.emoji_events_rounded,
-              color: AppColors.podiumGold,
-              size: 26,
+              Icons.emoji_events,
+              color: AppColors.lightOlive,
+              size: 24,
             ),
           ),
         ],
       ),
       body: state.isLoading
-          ? const _RankingSkeletons()
-          : state.projects.isEmpty
-              ? const BioEmptyView(
-                  title: 'Sin proyectos',
-                  subtitle: 'No hay proyectos disponibles aún',
-                  icon: Icons.bar_chart_outlined,
-                )
-              : ListView(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sp24),
-                  children: [
-                    // ── Podio Limpio ────────────────────────────────────────
-                    if (top3.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.sp16,
-                            AppSpacing.sp20, AppSpacing.sp16, AppSpacing.sp16),
-                        child: _CleanPodium(top3: top3, isDark: isDark),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sp16,
-                            vertical: AppSpacing.sp8),
-                        child: BioDivider(label: 'Clasificación'),
-                      ),
-                    ],
-
-                    // ── Lista posiciones 4+ ─────────────────────────────────
-                    if (rest.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sp16),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? AppColors.darkSurface1
-                                : AppColors.lightCard,
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.lg),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black
-                                    .withAlpha(isDark ? 30 : 12),
-                                blurRadius: 12,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
-                            child: Column(
-                              children: rest.asMap().entries.map((e) {
-                                final i = e.key + 4;
-                                final p = e.value;
-                                final isLast = e.key == rest.length - 1;
-                                return _RankingRow(
-                                  position: i,
-                                  project: p,
-                                  isDark: isDark,
-                                  isLast: isLast,
-                                  onTap: () =>
-                                      context.push('/project/${p.id}'),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+          ? _RankingSkeletons(isDark: isDark)
+          : ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              children: [
+                _PodiumSection(
+                  isDark: isDark,
+                  first: top3[0],
+                  second: top3[1],
+                  third: top3[2],
                 ),
+                const SizedBox(height: 20),
+                _SectionHeader(
+                  label: 'Clasificacion general',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 10),
+                if (rest.isEmpty)
+                  _NoMoreProjectsCard(isDark: isDark)
+                else
+                  _RankingListCard(projects: rest, isDark: isDark),
+              ],
+            ),
     );
   }
 }
 
-// ── Clean Podium ────────────────────────────────────────────────────────────
-// No gradients — depth achieved through solid color, size hierarchy, and shadows.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label, required this.isDark});
 
-class _CleanPodium extends StatelessWidget {
-  const _CleanPodium({required this.top3, required this.isDark});
-  final List<ProjectReadModel> top3;
+  final String label;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    // Reorder: 2nd (left), 1st (center/tallest), 3rd (right)
-    final ordered = [
-      if (top3.length > 1) (pos: 2, p: top3[1]),
-      (pos: 1, p: top3[0]),
-      if (top3.length > 2) (pos: 3, p: top3[2]),
-    ];
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color:
+                  isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
+class _PodiumSection extends StatelessWidget {
+  const _PodiumSection({
+    required this.isDark,
+    required this.first,
+    required this.second,
+    required this.third,
+  });
+
+  final bool isDark;
+  final ProjectReadModel? first;
+  final ProjectReadModel? second;
+  final ProjectReadModel? third;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 35 : 14),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: ordered.map((item) {
-          // Height hierarchy: 1st is tallest, creates natural podium shape
-          final barHeight = item.pos == 1
-              ? 100.0
-              : item.pos == 2
-                  ? 76.0
-                  : 60.0;
+        children: [
+          Expanded(
+            child: _PodiumSlot(
+              isDark: isDark,
+              position: 2,
+              project: second,
+              icon: Icons.workspace_premium,
+              barHeight: 88,
+              accent: AppColors.lightOlive,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _PodiumSlot(
+              isDark: isDark,
+              position: 1,
+              project: first,
+              icon: Icons.emoji_events,
+              barHeight: 120,
+              accent: AppColors.lightPrimary,
+              isPrimary: true,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _PodiumSlot(
+              isDark: isDark,
+              position: 3,
+              project: third,
+              icon: Icons.military_tech,
+              barHeight: 72,
+              accent: AppColors.lightOlive,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-          // Medal icon per position
-          final medalIcon = item.pos == 1
-              ? Icons.emoji_events_rounded
-              : item.pos == 2
-                  ? Icons.workspace_premium_rounded
-                  : Icons.military_tech_rounded;
+class _PodiumSlot extends StatelessWidget {
+  const _PodiumSlot({
+    required this.isDark,
+    required this.position,
+    required this.project,
+    required this.icon,
+    required this.barHeight,
+    required this.accent,
+    this.isPrimary = false,
+  });
 
-          // Medal color — solid, no gradients
-          // 1st: vibrant green (primary CTA), 2nd/3rd: olive (secondary/support)
-          final medalColor = item.pos == 1
-              ? AppColors.lightPrimary
-              : AppColors.lightOlive;
+  final bool isDark;
+  final int position;
+  final ProjectReadModel? project;
+  final IconData icon;
+  final double barHeight;
+  final Color accent;
+  final bool isPrimary;
 
-          // Podium bar — solid fill, no gradient
-          // 1st: green accent fill, others: olive with low opacity
-          final barColor = item.pos == 1
-              ? AppColors.lightPrimary.withAlpha(230)
-              : AppColors.lightOlive.withAlpha(isDark ? 80 : 40);
+  @override
+  Widget build(BuildContext context) {
+    final hasData = project != null;
+    final title = hasData ? project!.title : 'Posicion disponible';
+    final subtitle = hasData
+        ? '${project!.avgScore.toStringAsFixed(1)} pts'
+        : 'Aun sin proyecto asignado';
 
-          final positionTextColor = item.pos == 1
-              ? Colors.white
-              : (isDark ? AppColors.lightOlive : AppColors.lightOlive);
-
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => context.push('/project/${item.p.id}'),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // Medal icon
-                  Icon(medalIcon, color: medalColor,
-                      size: item.pos == 1 ? 28 : 22),
-                  const SizedBox(height: 6),
-
-                  // Project name
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      item.p.title,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: item.pos == 1 ? 12.5 : 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightForeground,
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Score — solid color, no ShaderMask gradient
-                  Text(
-                    '${item.p.avgScore.toStringAsFixed(1)} pts',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: item.pos == 1 ? 12 : 11,
-                      fontWeight: FontWeight.w700,
-                      color: medalColor,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Podium bar — solid, clean
-                  Container(
-                    height: barHeight,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: barColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(AppRadius.sm),
-                        topRight: Radius.circular(AppRadius.sm),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${item.pos}',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: item.pos == 1 ? 24 : 20,
-                        fontWeight: FontWeight.w900,
-                        color: positionTextColor,
-                      ),
-                    ),
-                  ),
-                ],
+    return GestureDetector(
+      onTap: hasData ? () => context.push('/project/${project!.id}') : null,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Icon(icon, size: isPrimary ? 28 : 24, color: accent),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: isPrimary ? 13 : 12,
+              fontWeight: FontWeight.w700,
+              color: hasData
+                  ? (isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightForeground)
+                  : (isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightMutedFg),
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: hasData
+                  ? accent
+                  : (isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightMutedFg),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: barHeight,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border.all(
+                color: hasData
+                    ? accent
+                    : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
               ),
             ),
+            child: Center(
+              child: Text(
+                '$position',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: isPrimary ? 30 : 24,
+                  fontWeight: FontWeight.w900,
+                  color: hasData
+                      ? accent
+                      : (isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightMutedFg),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankingListCard extends StatelessWidget {
+  const _RankingListCard({required this.projects, required this.isDark});
+
+  final List<ProjectReadModel> projects;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        ),
+      ),
+      child: Column(
+        children: projects.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final isLast = index == projects.length - 1;
+
+          return _RankingRow(
+            position: index + 4,
+            project: item,
+            isLast: isLast,
+            isDark: isDark,
           );
         }).toList(),
       ),
@@ -274,124 +373,199 @@ class _CleanPodium extends StatelessWidget {
   }
 }
 
-// ── Ranking Row — Clean card-style list item ──────────────────────────────────
-
 class _RankingRow extends StatelessWidget {
   const _RankingRow({
     required this.position,
     required this.project,
-    required this.isDark,
     required this.isLast,
-    required this.onTap,
+    required this.isDark,
   });
 
   final int position;
   final ProjectReadModel project;
-  final bool isDark;
   final bool isLast;
-  final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightMutedFg;
-
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sp16, vertical: AppSpacing.sp14),
+    return InkWell(
+      onTap: () => context.push('/project/${project.id}'),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: [
-                // Position number — muted grey, clean and minimal
-                SizedBox(
-                  width: 28,
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color:
+                        isDark ? AppColors.darkSurface2 : AppColors.lightMuted,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   child: Text(
                     '$position',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightMutedFg,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sp12),
-
-                // Project name — strong weight
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     project.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                       color: isDark
                           ? AppColors.darkTextPrimary
                           : AppColors.lightForeground,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-
-                // Score — vibrant green, solid color (no ShaderMask)
+                const SizedBox(width: 8),
                 Text(
-                  '${project.avgScore.toStringAsFixed(1)} pts',
-                  style: const TextStyle(
+                  project.avgScore.toStringAsFixed(1),
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.lightPrimary,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.lightOlive,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sp8),
-                Icon(Icons.chevron_right_rounded,
-                    color: textSecondary, size: 18),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightMutedFg,
+                  size: 18,
+                ),
               ],
             ),
           ),
-        ),
-        if (!isLast)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp16),
-            child: BioDivider(),
-          ),
-      ],
+          if (!isLast)
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              indent: 14,
+              endIndent: 14,
+            ),
+        ],
+      ),
     );
   }
 }
 
-// ── Skeletons de carga ─────────────────────────────────────────────────────
+class _NoMoreProjectsCard extends StatelessWidget {
+  const _NoMoreProjectsCard({required this.isDark});
 
-class _RankingSkeletons extends StatelessWidget {
-  const _RankingSkeletons();
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sp16, vertical: AppSpacing.sp20),
-      itemCount: 8,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sp12),
-      itemBuilder: (_, i) => Row(
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        ),
+      ),
+      child: Row(
         children: [
-          BioSkeleton(width: 24, height: 16, radius: AppRadius.sm),
-          const SizedBox(width: AppSpacing.sp12),
+          const Icon(Icons.info_outline, color: AppColors.lightOlive),
+          const SizedBox(width: 10),
           Expanded(
-            child: BioSkeleton(
-              height: 14,
-              radius: AppRadius.sm,
-              width: double.infinity,
+            child: Text(
+              'Aun no hay mas proyectos en clasificacion. El podio superior permanece activo.',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightMutedFg,
+              ),
             ),
           ),
-          const SizedBox(width: AppSpacing.sp16),
-          BioSkeleton(width: 40, height: 14, radius: AppRadius.sm),
         ],
       ),
+    );
+  }
+}
+
+class _RankingSkeletons extends StatelessWidget {
+  const _RankingSkeletons({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: const [
+              Expanded(child: BioSkeleton(height: 170, radius: 12)),
+              SizedBox(width: 10),
+              Expanded(child: BioSkeleton(height: 205, radius: 12)),
+              SizedBox(width: 10),
+              Expanded(child: BioSkeleton(height: 155, radius: 12)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface1 : AppColors.lightCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
+          ),
+          child: Column(
+            children: List.generate(
+              5,
+              (index) => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    BioSkeleton(width: 32, height: 32, radius: 10),
+                    SizedBox(width: 10),
+                    Expanded(child: BioSkeleton(height: 14, radius: 8)),
+                    SizedBox(width: 14),
+                    BioSkeleton(width: 34, height: 14, radius: 8),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
