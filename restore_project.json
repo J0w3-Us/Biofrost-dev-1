@@ -1,0 +1,49 @@
+{
+    "titulo": "Uziel Back",
+    "videoUrl": "",
+    "esPublico": true,
+    "canvasBlocks": [
+        {
+            "id": "b066f35f-0491-4ee4-865d-b710c97002cf",
+            "type": "text",
+            "content": "Isaac\n\nKiosko Integrador Hub (IntegradorHub)\nTransformando el talento universitario: De \"Tareas Escolares\" a \"Activos Profesionales\".\n\n💡 La Visión\n\nIntegradorHub es una plataforma de gestión de talento y exhibición de proyectos diseñada para acabar con el fenómeno del \"Cementerio de Proyectos\" en la universidad. Su objetivo es centralizar, documentar y dar visibilidad al capital intelectual generado por los estudiantes de Desarrollo de Software, permitiendo que sus trabajos trasciendan más allá de una calificación.\n\n🛠️ Stack Tecnológico (La Arquitectura)\n\nUn sistema robusto construido con estándares de industria para garantizar escalabilidad y mantenibilidad.\n\nFrontend: React 18 + Vite (SPA), Tailwind CSS (Diseño Premium), Framer Motion.\n\nBackend: .NET 8 Web API implementando Clean Architecture (CQRS pattern con MediatR).\n\nBase de Datos: Google Firestore (NoSQL) para flexibilidad de esquemas.\n\nServicios: Firebase Auth (Identidad) & Storage.\n\n🌟 Módulos Principales\n\n1. 🎨 Kiosko Público (Showcase)\n\nUna galería estilo \"Dribbble/Behance\" donde los proyectos son visibles para toda la comunidad.\n\nGrid Inteligente: Visualización responsiva de tarjetas de proyecto.\n\nFiltros Avanzados: Búsqueda por stack tecnológico (React, Flutter, Python) o materia.\n\nVisibilidad Real: Permite a reclutadores o alumnos de otras carreras descubrir talento técnico.\n\n2. 📝 Project Canvas (Editor Inteligente)\n\nEl corazón de la documentación académica.\n\nExperiencia tipo Notion: Un editor rico para redactar la documentación técnica del proyecto.\n\nEstructura Guiada: Plantillas para definir \"Problema\", \"Solución\", \"Arquitectura\" y \"Lecciones Aprendidas\".\n\nColaboración: Vinculación directa con el equipo de trabajo.\n\n3. 🛡️ Gestión de \"Squads\" (Equipos)\n\nLógica de negocio estricta para garantizar la integridad académica.\n\nAsignación en Cascada: Los docentes solo pueden crear proyectos para sus materias y grupos asignados.\n\nValidación de Roles: Los alumnos solo pueden unirse a proyectos de su propio grupo.\n\nPerfiles Híbridos: Identidad que combina datos académicos (Matrícula) con roles profesionales (ej. Backend Lead).\n\n🎯 Estado Actual\\n\\n✅ Core Backend: Arquitectura limpia y Endpoints de seguridad listos.\n\n✅ Diseño UI: Sistema de diseño minimalista implementado.\n\n✅ Módulo de Editor: Funcional y desplegado.\n\n🔄 Próximos Pasos: Implementación de métricas de evaluación y expansión a otras carreras.\n\n",
+            "order": 0,
+            "metadata": {}
+        },
+        {
+            "id": "abd39950-38cb-4eee-bd82-37aeca0958d8",
+            "type": "divider",
+            "content": "",
+            "order": 0,
+            "metadata": {}
+        },
+        {
+            "id": "83da8ebd-8499-4bca-a6c1-903c85137388",
+            "type": "image",
+            "content": "",
+            "order": 0,
+            "metadata": {}
+        },
+        {
+            "id": "1e117c78-f280-4abd-bd2e-c9f41a3622ca",
+            "type": "text",
+            "content": "",
+            "order": 0,
+            "metadata": {}
+        },
+        {
+            "id": "18fd305a-f9f8-4c15-947c-6653d47903e4",
+            "type": "h2",
+            "content": "kiosko - Integrador hub",
+            "order": 0,
+            "metadata": {}
+        },
+        {
+            "id": "2b48e2e3-7e0d-45ce-ade9-a284114c3888",
+            "type": "h1",
+            "content": "",
+            "order": 0,
+            "metadata": {}
+        }
+    ]
+}

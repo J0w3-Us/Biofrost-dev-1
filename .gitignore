@@ -1,0 +1,48 @@
+# General
+
+.DS_Store
+Thumbs.db
+*~
+
+# VS Code
+.vscode/
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+
+# Dart/Flutter
+*.lock
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+
+# Build outputs
+/build/
+**/build/
+
+# iOS
+Pods/
+Runner.xcworkspace/
+
+# Android
+.gradle/
+/local.properties
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Secrets (do not commit service account credentials)
+integradorhub-dsm-firebase-adminsdk-fbsvc-d89dd8625c.json
+
+# Large binary assets (use Git LFS when needed)
+Biofrost_web/public/models/*.glb

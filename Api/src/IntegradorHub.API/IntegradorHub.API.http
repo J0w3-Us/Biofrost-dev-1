@@ -1,0 +1,6 @@
+@IntegradorHub.API_HostAddress = http://localhost:5093
+
+GET {{IntegradorHub.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

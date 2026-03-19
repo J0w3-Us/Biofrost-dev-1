@@ -1,0 +1,21 @@
+# .NET Core
+bin/
+obj/
+
+# Configuraciones locales
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# Entornos virtuales / Variables de entorno
+.env

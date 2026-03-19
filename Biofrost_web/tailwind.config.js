@@ -1,0 +1,116 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
+        display: ['Outfit', '-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        // Apple-style Grayscale
+        gray: {
+          25: '#fafafa',
+          50: '#f5f5f7',
+          100: '#ececf1',
+          150: '#e5e5e7',
+          200: '#e0e0e0',
+          250: '#d6d6db',
+          300: '#d1d1d6',
+          350: '#c6c6cc',
+          400: '#a1a1a6',
+          500: '#86868b',
+          600: '#6f6f77',
+          700: '#555560',
+          800: '#424245',
+          850: '#36363b',
+          900: '#1d1d1f',
+          950: '#000000',
+        },
+      },
+      spacing: {
+        0: '0',
+        1: '0.25rem',
+        2: '0.5rem',
+        3: '0.75rem',
+        4: '1rem',
+        5: '1.25rem',
+        6: '1.5rem',
+        8: '2rem',
+        10: '2.5rem',
+        12: '3rem',
+        16: '4rem',
+        20: '5rem',
+        24: '6rem',
+        32: '8rem',
+      },
+      borderRadius: {
+        'xs': '0.375rem',
+        'sm': '0.5rem',
+        'md': '0.75rem',
+        'lg': '1rem',
+        'xl': '1.25rem',
+        '2xl': '1.5rem',
+        '3xl': '2rem',
+      },
+      boxShadow: {
+        'xs': '0 0.5px 1px 0 rgb(0 0 0 / 0.05)',
+        'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'md': '0 2px 4px 0 rgb(0 0 0 / 0.08)',
+        'lg': '0 4px 12px 0 rgb(0 0 0 / 0.12)',
+        'xl': '0 8px 24px 0 rgb(0 0 0 / 0.15)',
+        '2xl': '0 16px 40px 0 rgb(0 0 0 / 0.18)',
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem', letterSpacing: '-0.01em' }],
+        'sm': ['0.875rem', { lineHeight: '1.25rem', letterSpacing: '-0.01em' }],
+        'base': ['1rem', { lineHeight: '1.5rem', letterSpacing: '-0.01em' }],
+        'lg': ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }],
+        'xl': ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '-0.02em' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.02em' }],
+        '3xl': ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '-0.02em' }],
+        '4xl': ['2.25rem', { lineHeight: '2.5rem', letterSpacing: '-0.02em' }],
+        '5xl': ['3rem', { lineHeight: '3.5rem', letterSpacing: '-0.03em' }],
+      },
+      transitionDuration: {
+        'fast': '150ms',
+        'base': '200ms',
+        'medium': '300ms',
+        'slow': '500ms',
+      },
+      transitionTimingFunction: {
+        'ease-smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'ease-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'ease-apple': 'cubic-bezier(0.23, 1, 0.320, 1)',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.3s ease-smooth',
+        'slide-up': 'slideUp 0.3s ease-smooth',
+        'slide-down': 'slideDown 0.3s ease-smooth',
+        'scale-in': 'scaleIn 0.2s ease-smooth',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(8px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        slideDown: {
+          '0%': { transform: 'translateY(-8px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+      },
+    },
+  },
+  plugins: [],
+}

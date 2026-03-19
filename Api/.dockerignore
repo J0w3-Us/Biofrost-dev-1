@@ -1,0 +1,12 @@
+bin/
+obj/
+*.log
+.vscode/
+.vs/
+*.user
+*.userosscache
+*.suo
+node_modules/
+appsettings.Development.json
+appsettings.*.json
+integradorhub-dsm-firebase-adminsdk*.json
